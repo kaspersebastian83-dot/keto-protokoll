@@ -125,6 +125,7 @@ td.num,th.num{text-align:right}
  <header>
   <h1>Keto-Protokoll</h1>
   <p class="sub" id="hsub"></p>
+  <p class="sub" id="verline" style="font-size:.75rem"></p>
   <p class="nudge" id="nudge" hidden></p>
  </header>
  <div class="strip" id="strip" aria-label="Übersicht aller Tage"></div>
@@ -151,6 +152,7 @@ td.num,th.num{text-align:right}
 
 <script>
 const KEY='ketoProtokoll_v1';
+const VERSION='1.1.0';
 const SYMS=['Kopfschmerz','Müdigkeit','Muskelkrämpfe','Verdauung','Schwindel','Schlecht geschlafen','Heißhunger','Herzklopfen','Gereizt'];
 const DEFAULT_LABS=[['HbA1c','%'],['Glukose nüchtern','mg/dl'],['Gesamtcholesterin','mg/dl'],['LDL-Cholesterin','mg/dl'],['HDL-Cholesterin','mg/dl'],['Triglyzeride','mg/dl'],['Harnsäure','mg/dl'],['Kreatinin','mg/dl'],['eGFR','ml/min'],['GPT (ALT)','U/l'],['GOT (AST)','U/l'],['Gamma-GT','U/l'],['Natrium','mmol/l'],['Kalium','mmol/l'],['Magnesium','mmol/l'],['TSH','mU/l'],['CRP','mg/l']];
 const $=s=>document.querySelector(s);
@@ -412,7 +414,7 @@ function sheetHTML(wn,fill){
  <tr class="tall"><th>Beschwerden, Notizen<small>Kopfweh, Krämpfe, Schlaf …</small></th>${days.map(ds=>{const d=D(ds);return `<td style="font-size:7.5pt;text-align:left;vertical-align:top">${esc([...(d.sym||[]),d.note||''].filter(Boolean).join(', '))}</td>`}).join('')}</tr>
  </tbody></table>
  <div class="wk"><div>Bauchumfang (cm)${wv('waist','')}</div><div>Ruhepuls Ø (Garmin)${wv('rhr','')}</div><div>Schlaf Ø (h)${wv('sleep','')}</div><div>Stress Ø (Garmin)${wv('stress','')}</div><div>Schritte Ø pro Tag${wv('steps','')}</div><div>Wochennotiz<br>${esc(w.note||'')}</div></div>
- <p class="foot">Morgens messen, nach dem Aufstehen, vor Frühstück und Kaffee. Blutdruck sitzend nach 5 Minuten Ruhe. Einmal pro Woche ins Protokoll übertragen.</p></div>`;
+ <p class="foot">Morgens messen, nach dem Aufstehen, vor Frühstück und Kaffee. Blutdruck sitzend nach 5 Minuten Ruhe. Einmal pro Woche ins Protokoll übertragen. · Keto-Protokoll v${VERSION}</p></div>`;
 }
 
 function generateTalkingPoints(){
@@ -527,6 +529,7 @@ function reportHTML(){
  <p class="small">Beobachtungen aus den erfassten Daten, keine medizinische Bewertung — als Gesprächsgrundlage gedacht.</p>
  ${talkingPoints.length?`<ul>${talkingPoints.map(p=>`<li>${p}</li>`).join('')}</ul>`:'<p>Keine auffälligen Muster in diesem Zeitraum.</p>'}
  <h2>Fragen für die Besprechung</h2><div class="qs">${esc(st.questions)}</div>
+ <p class="small" style="margin-top:4mm">Keto-Protokoll v${VERSION}</p>
  </div>`;
 }
 
@@ -560,7 +563,8 @@ function renderSet(){
  </tbody></table><div class="btns"><button type="button" class="btn" id="medAdd">Medikament hinzufügen</button></div></div>
  <div class="panel"><h2>Backup</h2><p class="sub">Die Daten liegen nur in diesem Browser. Sichere sie regelmäßig, und übertrage sie so auch zwischen Handy und Rechner.${st.lastBackup?` Letztes Backup: ${fd(st.lastBackup,{day:'numeric',month:'long'})}.`:''}</p>
  <div class="btns"><button type="button" class="btn primary" id="exp">Backup speichern</button><button type="button" class="btn" id="imp">Backup laden</button><button type="button" class="btn" id="csv">Tageswerte als CSV</button></div></div>
- <div class="panel"><h2>Alles löschen</h2><p class="sub">Entfernt alle Einträge aus diesem Browser.</p><div class="btns"><button type="button" class="btn danger" id="reset">Alle Daten löschen</button></div></div>`;
+ <div class="panel"><h2>Alles löschen</h2><p class="sub">Entfernt alle Einträge aus diesem Browser.</p><div class="btns"><button type="button" class="btn danger" id="reset">Alle Daten löschen</button></div></div>
+ <p class="sub" style="text-align:center">Keto-Protokoll v${VERSION}</p>`;
 }
 $('#v-set').addEventListener('change',e=>{
  const t=e.target,k=t.dataset.s;
@@ -599,6 +603,7 @@ $('#strip').addEventListener('click',e=>{const b=e.target.closest('[data-date]')
 $('#nudge').addEventListener('click',e=>{if(e.target.dataset.goto)show(e.target.dataset.goto)});
 function renderAll(){curWeek=Math.min(nWeeks(),Math.max(1,weekOf(today())));show(curTab)}
 
+$('#verline').textContent='v'+VERSION;
 load();renderAll();
 </script>
 </body>
