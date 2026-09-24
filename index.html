@@ -9,8 +9,6 @@
 <meta name="theme-color" content="#1D3A6B">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="default">
-<link rel="preconnect" href="https://fonts.googleapis.com">
-<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;500;600&family=IBM+Plex+Serif:wght@500;600&display=swap" rel="stylesheet">
 <style id="pagestyle">@page{size:A4 portrait;margin:12mm}</style>
 <style>
 :root{--paper:#FAFCFE;--grid:#E6EDF5;--ink:#1D3A6B;--text:#22272E;--muted:#667281;--line:#C9D4E0;--field:#FFFFFF;--keto:#0F7F73;--ketoBand:rgba(15,127,115,.13);--s2:#B4541F;--warn:#B42318;color-scheme:light dark}
@@ -19,7 +17,7 @@
 :root{box-sizing:border-box;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}
 *,*::before,*::after{box-sizing:inherit}
 html{scroll-padding-top:env(safe-area-inset-top,0px)}
-body{margin:0;background-color:var(--paper);background-image:linear-gradient(var(--grid) 1px,transparent 1px),linear-gradient(90deg,var(--grid) 1px,transparent 1px);background-size:24px 24px;color:var(--text);font:16px/1.5 "IBM Plex Sans",system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;font-variant-numeric:tabular-nums}
+body{margin:0;background-color:var(--paper);background-image:linear-gradient(var(--grid) 1px,transparent 1px),linear-gradient(90deg,var(--grid) 1px,transparent 1px);background-size:24px 24px;color:var(--text);font:16px/1.5 system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;font-variant-numeric:tabular-nums}
 .wrap{max-width:760px;margin:0 auto;padding:16px 16px 64px}
 header h1{font-weight:600;font-size:1.7rem;line-height:1.2;color:var(--ink);margin:4px 0 2px;letter-spacing:-.01em}
 .sub{color:var(--muted);font-size:.9rem;margin:0}
@@ -120,10 +118,10 @@ td.num,th.num{text-align:right}
 .sheet .band{background:var(--ink);color:#fff;padding:2.6mm 0;margin:0 0 1.6mm;display:flex;justify-content:space-between;align-items:center}
 .sheet .band .l{display:flex;align-items:baseline}
 .sheet .band .r{color:#c3cfe4;font-size:9.2pt}
-.sheet .band .wk-title{font-family:"IBM Plex Serif",Georgia,serif;font-weight:600;font-size:19pt;color:#fff;display:inline;border:0;padding:0;margin:0}
+.sheet .band .wk-title{font-family:Georgia,"Times New Roman",serif;font-weight:600;font-size:19pt;color:#fff;display:inline;border:0;padding:0;margin:0}
 .sheet .band .range{font-size:10pt;color:#c3cfe4;margin-left:3mm}
 .sheet .daycell{text-align:center;padding:1.2mm 0 .8mm;border:.5pt solid var(--line)}
-.sheet .daynum{font-family:"IBM Plex Serif",Georgia,serif;font-weight:600;font-size:19pt;color:var(--ink);display:block;line-height:1}
+.sheet .daynum{font-family:Georgia,"Times New Roman",serif;font-weight:600;font-size:19pt;color:var(--ink);display:block;line-height:1}
 .sheet .dayname{font-size:8.4pt;color:var(--muted)}
 .sheet .rowlabel{width:40mm;text-align:left;font-weight:600;font-size:9.4pt;line-height:1.15;border:.5pt solid var(--line)}
 .sheet .rowlabel small{display:block;font-weight:400;color:#555;font-size:7.6pt;line-height:1.15}
@@ -137,7 +135,7 @@ td.num,th.num{text-align:right}
 .sheet .ruled{background-image:repeating-linear-gradient(#fff 0 7.4mm,var(--hair) 7.4mm 7.6mm);background-position:0 4mm}
 .sheet tr.tall td.cell{height:15mm}
 .sheet .wk-wrap{border-top:.8pt solid var(--ink);margin-top:1.1mm;padding-top:.6mm}
-.sheet .wk-label{font-family:"IBM Plex Serif",Georgia,serif;font-size:9pt;font-weight:600;color:var(--ink);margin:0 0 1mm}
+.sheet .wk-label{font-family:Georgia,"Times New Roman",serif;font-size:9pt;font-weight:600;color:var(--ink);margin:0 0 1mm}
 .sheet .wk{display:grid;grid-template-columns:repeat(5,1fr) 2.2fr;gap:2mm}
 .sheet .wk div{border:.6pt solid #666;padding:.8mm 2mm;min-height:9mm;font-size:8.5pt;color:#333;line-height:1.2}
 .sheet .wk b{display:block;font-size:11pt;color:#000;margin-top:.5mm}
@@ -147,17 +145,17 @@ td.num,th.num{text-align:right}
 /* ===== doctor report ===== */
 .report-title{margin-bottom:0}
 .report-title .tag{display:inline-block;font-size:8.3pt;color:var(--keto);font-weight:500;background:var(--ketoBand);padding:1.6mm 3mm;border-radius:2px;margin-bottom:4mm}
-.report h1{font-family:"IBM Plex Serif",Georgia,serif;font-weight:600;font-size:27pt;color:var(--ink);letter-spacing:-.01em;line-height:1.05;margin:0}
+.report h1{font-family:Georgia,"Times New Roman",serif;font-weight:600;font-size:27pt;color:var(--ink);letter-spacing:-.01em;line-height:1.05;margin:0}
 .report-title .subtitle{font-size:10.3pt;color:var(--muted);margin-top:2mm}
 .report-title .rule{height:1pt;background:var(--ink);margin:5mm 0 6mm}
 .report .stats{width:100%;border-collapse:collapse;margin-bottom:9mm}
 .report .stats td{width:33.33%;padding:0 6mm 0 0;vertical-align:top;border-right:.6pt solid var(--line)}
 .report .stats td:last-child{border-right:0;padding-right:0}
 .report .stats td:not(:first-child){padding-left:6mm}
-.report .stat-n{font-family:"IBM Plex Serif",Georgia,serif;font-weight:600;font-size:19pt;display:block}
+.report .stat-n{font-family:Georgia,"Times New Roman",serif;font-weight:600;font-size:19pt;display:block}
 .report .stat-l{font-size:8.4pt;color:var(--muted);margin-top:.8mm}
 .report .stat-n.down{color:var(--keto)}.report .stat-n.up{color:var(--s2)}.report .stat-n.flat{color:var(--ink)}
-.report h2{font-family:"IBM Plex Serif",Georgia,serif;font-weight:500;font-size:13.5pt;color:var(--ink);margin:9mm 0 3mm;padding-left:3mm;border-left:2.6pt solid var(--ink);break-after:avoid;break-inside:avoid}
+.report h2{font-family:Georgia,"Times New Roman",serif;font-weight:500;font-size:13.5pt;color:var(--ink);margin:9mm 0 3mm;padding-left:3mm;border-left:2.6pt solid var(--ink);break-after:avoid;break-inside:avoid}
 .report h2:first-of-type{margin-top:0}
 .report h2+*{break-inside:avoid}
 .report table{font-size:9.5pt}
@@ -179,7 +177,7 @@ td.num,th.num{text-align:right}
 .report .callout ul{padding-left:4mm;margin-top:0}
 .report .callout li{margin:1.6mm 0}
 .report .qs{white-space:pre-wrap;border:.6pt solid #999;padding:2mm 3mm;min-height:30mm}
-.report .refs{font-family:"IBM Plex Sans",system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;font-size:8.3pt;color:#333;margin:0;padding:0;list-style:none}
+.report .refs{font-family:system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;font-size:8.3pt;color:#333;margin:0;padding:0;list-style:none}
 .report .refs li{padding-left:5mm;text-indent:-5mm;margin:1.6mm 0}
 </style>
 </head>
@@ -217,7 +215,7 @@ td.num,th.num{text-align:right}
 
 <script>
 const KEY='ketoProtokoll_v1';
-const VERSION='1.5.0'; // keep sw.js's CACHE_NAME suffix in sync with this by hand
+const VERSION='1.5.1'; // keep in sync with package.json, package-lock.json, and sw.js
 const SYMS=['Kopfschmerz','Müdigkeit','Muskelkrämpfe','Verdauung','Schwindel','Schlecht geschlafen','Heißhunger','Herzklopfen','Gereizt'];
 const DEFAULT_LABS=[['HbA1c','%'],['Glukose nüchtern','mg/dl'],['Gesamtcholesterin','mg/dl'],['LDL-Cholesterin','mg/dl'],['HDL-Cholesterin','mg/dl'],['Triglyzeride','mg/dl'],['Harnsäure','mg/dl'],['Kreatinin','mg/dl'],['eGFR','ml/min'],['GPT (ALT)','U/l'],['GOT (AST)','U/l'],['Gamma-GT','U/l'],['Natrium','mmol/l'],['Kalium','mmol/l'],['Magnesium','mmol/l'],['TSH','mU/l'],['CRP','mg/l']];
 const REFERENCES=[
@@ -1136,8 +1134,8 @@ checkStorage();
 
 /* Registers sw.js for offline support. Only takes effect over HTTPS (e.g. GitHub
    Pages) — 'serviceWorker' is undefined under file://, so this silently no-ops
-   there. sw.js's CACHE_NAME carries its own copy of VERSION; bump both by hand
-   together whenever VERSION changes, so every release invalidates the old cache. */
+   there. Keep index.html VERSION, package.json version, package-lock.json version
+   metadata, and sw.js CACHE_NAME synchronized so each release replaces the cache. */
 if('serviceWorker' in navigator){
  try{navigator.serviceWorker.register('sw.js').catch(()=>{})}catch(e){}
 }
