@@ -1,6 +1,8 @@
 # Personal health data – never commit backups or exports
 *.json
 !manifest.json
+!package.json
+!package-lock.json
 *.csv
 backup/
 exports/
@@ -10,3 +12,10 @@ exports/
 Thumbs.db
 .vscode/
 .idea/
+
+# test tooling
+node_modules/
+test-results/
+playwright-report/
+blob-report/
+playwright/.cache/

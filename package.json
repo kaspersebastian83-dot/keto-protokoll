@@ -1,0 +1,12 @@
+{
+  "name": "keto-protokoll",
+  "private": true,
+  "version": "1.2.0",
+  "description": "Single-file offline web app for logging a ketogenic diet trial.",
+  "scripts": {
+    "test": "playwright test"
+  },
+  "devDependencies": {
+    "@playwright/test": "1.56.1"
+  }
+}
