@@ -10,7 +10,7 @@
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="default">
 <link rel="preconnect" href="https://fonts.googleapis.com">
-<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;500;600&display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;500;600&family=IBM+Plex+Serif:wght@500;600&display=swap" rel="stylesheet">
 <style id="pagestyle">@page{size:A4 portrait;margin:12mm}</style>
 <style>
 :root{--paper:#FAFCFE;--grid:#E6EDF5;--ink:#1D3A6B;--text:#22272E;--muted:#667281;--line:#C9D4E0;--field:#FFFFFF;--keto:#0F7F73;--ketoBand:rgba(15,127,115,.13);--s2:#B4541F;--warn:#B42318;color-scheme:light dark}
@@ -97,26 +97,41 @@ td.num,th.num{text-align:right}
  body>*:not(#print){display:none!important}
  #print{display:block}
 }
-.sheet h2{font-size:15pt;margin:0;color:#1D3A6B}
-.sheet .sh{display:flex;justify-content:space-between;align-items:baseline;margin-bottom:3mm}
+.sheet h2{font-family:"IBM Plex Serif",Georgia,serif;font-size:17pt;font-weight:600;margin:0;color:#fff}
+.sheet .sh{background:#1D3A6B;color:#fff;display:flex;justify-content:space-between;align-items:flex-end;padding:3mm 4mm;margin:0 0 3mm;border-radius:1mm}
+.sheet .sh-app{display:block;font-size:7.5pt;letter-spacing:.6mm;text-transform:uppercase;color:rgba(255,255,255,.72);margin:0 0 .8mm}
+.sheet .sh-date{font-size:8.5pt;font-weight:400;color:rgba(255,255,255,.88)}
 .sheet table{table-layout:fixed;width:100%;border-collapse:collapse}
-.sheet th,.sheet td{border:.6pt solid #666;padding:1mm 2mm;color:#000}
-.sheet thead th{text-align:center;font-weight:600;font-size:10pt;height:9mm}
+.sheet th,.sheet td{border-right:.6pt solid #666;padding:1mm 2mm;color:#000}
+.sheet th:last-child,.sheet td:last-child{border-right:0}
+.sheet tbody tr td,.sheet tbody tr th{border-bottom:.25pt solid #ccc}
+.sheet tbody tr:last-child td,.sheet tbody tr:last-child th{border-bottom:.6pt solid #666}
+.sheet thead th{border-bottom:.6pt solid #666;text-align:center;font-weight:600;font-size:10pt;height:9mm}
 .sheet tbody th{width:40mm;text-align:left;font-weight:600;font-size:10pt}
 .sheet th small{display:block;font-weight:400;color:#555;font-size:7.5pt}
-.sheet tbody td{height:11mm;text-align:center;font-size:12pt}
+.sheet tbody td{text-align:center;font-size:12pt}
+.sheet tbody.blk-daily td,.sheet tbody.blk-daily th{background:var(--ketoBand);height:13mm}
+.sheet tbody.blk-befinden td,.sheet tbody.blk-befinden th{height:9mm}
 .sheet .opts{color:#999;font-size:9pt;letter-spacing:1.6mm}
 .sheet tr.tall td{height:17mm}
-.sheet .wk{display:grid;grid-template-columns:repeat(5,1fr) 2.2fr;gap:2.5mm;margin-top:3.5mm}
+.sheet .wk-wrap{border-top:.8pt solid #1D3A6B;margin-top:4mm;padding-top:2mm}
+.sheet .wk-label{font-family:"IBM Plex Serif",Georgia,serif;font-size:9pt;font-weight:600;color:#1D3A6B;margin:0 0 1.5mm}
+.sheet .wk{display:grid;grid-template-columns:repeat(5,1fr) 2.2fr;gap:2.5mm}
 .sheet .wk div{border:.6pt solid #666;padding:1.2mm 2mm;min-height:15mm;font-size:8.5pt;color:#333}
 .sheet .wk b{display:block;font-size:11pt;color:#000;margin-top:1mm}
 .sheet .foot{font-size:7.5pt;color:#555;margin-top:2mm}
-.report h1{font-size:17pt;color:#1D3A6B;margin:0 0 1mm}
-.report h2{font-size:12pt;color:#1D3A6B;border-bottom:.8pt solid #1D3A6B;padding-bottom:1mm;margin:6mm 0 2mm;break-after:avoid}
+.report-title{padding-bottom:2mm;margin-bottom:4mm;border-bottom:.8pt solid #1D3A6B}
+.report-title .overline{font-size:7.5pt;letter-spacing:.6mm;text-transform:uppercase;color:#1D3A6B;margin:0 0 1mm}
+.report-title .subtitle{font-size:9pt;color:#444;margin:0}
+.report h1{font-family:"IBM Plex Serif",Georgia,serif;font-size:22pt;font-weight:600;color:#1D3A6B;margin:0 0 1.5mm}
+.report h2{font-family:"IBM Plex Serif",Georgia,serif;font-size:12pt;font-weight:600;color:#1D3A6B;border-bottom:.8pt solid #1D3A6B;padding-bottom:.8mm;margin:5mm 0 1.5mm;break-after:avoid}
 .report table{font-size:9.5pt}
-.report th,.report td{padding:1.2mm 2mm;border-bottom:.5pt solid #bbb;color:#000}
-.report .cg{display:grid;grid-template-columns:1fr 1fr;gap:4mm 6mm}
+.report th,.report td{padding:1.2mm 2mm;border-bottom:.3pt solid #ddd;color:#000}
+.report thead th{border-bottom:.8pt solid #1D3A6B}
+.report .cg{display:grid;grid-template-columns:1fr 1fr;gap:5mm 6mm;align-items:start}
 .report .chart{break-inside:avoid;margin:0}
+.report .chart figcaption{margin-bottom:1mm;line-height:1.2}
+.report .chart .sub{margin:.5mm 0 0;font-size:7.5pt;line-height:1.2}
 .report .chart text{font-size:13px}
 .report p{margin:1mm 0}
 .report ul{margin:1mm 0;padding-left:4mm}
@@ -400,25 +415,29 @@ function sheetHTML(wn,fill){
  const [a,b]=weekRange(wn),days=Array.from({length:7},(_,i)=>addDays(a,i));
  const D=ds=>fill?(S.days[ds]||{}):{};
  const cell=(ds,f)=>{const v=D(ds)[f];return v==null?'':fmt(v,2)};
- const rows=[
+ const dailyRows=[
   ['Gewicht','kg, morgens',ds=>cell(ds,'w')],
   ['Blutzucker','mg/dl, nüchtern',ds=>cell(ds,'g')],
   ['Ketone','mmol/l, nüchtern',ds=>cell(ds,'k')],
   ['Blutdruck','sys / dia',ds=>{const d=D(ds);return d.sys!=null?`${d.sys}/${d.dia??''}`:'<span class="opts">/</span>'}],
-  ['Kohlenhydrate',`g, Limit ${S.settings.carbGoal} g`,ds=>cell(ds,'c')],
+  ...S.settings.meds.map(m=>[esc(m.name),esc(m.dose),ds=>{const v=(D(ds).meds||{})[m.id];return v===true?'<b>✓</b>':v===false?'<b>✗</b>':'<span class="opts">□</span>'}]),
+  ['Kohlenhydrate',`g, Limit ${S.settings.carbGoal} g`,ds=>cell(ds,'c')]
+ ];
+ const befindenRows=[
   ['Energie','1 schlapp, 5 topfit',ds=>D(ds).en?`<b>${D(ds).en}</b>`:'<span class="opts">1 2 3 4 5</span>'],
   ['Hunger','1 kaum, 5 stark',ds=>D(ds).hu?`<b>${D(ds).hu}</b>`:'<span class="opts">1 2 3 4 5</span>'],
-  ['Im Plan?','ja, teils, nein',ds=>{const p=D(ds).plan;return p?`<b>${{y:'✓',t:'~',n:'✗'}[p]}</b>`:'<span class="opts">✓ ~ ✗</span>'}],
-  ...S.settings.meds.map(m=>[esc(m.name),esc(m.dose),ds=>{const v=(D(ds).meds||{})[m.id];return v===true?'<b>✓</b>':v===false?'<b>✗</b>':'<span class="opts">□</span>'}])
+  ['Im Plan?','ja, teils, nein',ds=>{const p=D(ds).plan;return p?`<b>${{y:'✓',t:'~',n:'✗'}[p]}</b>`:'<span class="opts">✓ ~ ✗</span>'}]
  ];
+ const rowHTML=([l,s,fn])=>`<tr><th>${l}<small>${s}</small></th>${days.map(ds=>`<td>${fn(ds)}</td>`).join('')}</tr>`;
  const w=fill?(S.weeks[wn]||{}):{};
  const wv=(f,u)=>w[f]!=null?`<b>${fmt(w[f],1)} ${u}</b>`:'';
- return `<div class="sheet"><div class="sh"><h2>Keto-Protokoll, Woche ${wn}</h2><span>${fd(a,{day:'numeric',month:'long'})} bis ${fd(b,{day:'numeric',month:'long',year:'numeric'})}${S.settings.name?', '+esc(S.settings.name):''}</span></div>
- <table><thead><tr><th style="width:40mm"></th>${days.map(ds=>`<th>${fd(ds,{weekday:'short'})}<br><small>${fd(ds)}</small></th>`).join('')}</tr></thead><tbody>
- ${rows.map(([l,s,fn])=>`<tr><th>${l}<small>${s}</small></th>${days.map(ds=>`<td>${fn(ds)}</td>`).join('')}</tr>`).join('')}
+ return `<div class="sheet"><div class="sh"><div><span class="sh-app">Keto-Protokoll</span><h2>Woche ${wn}</h2></div><span class="sh-date">${fd(a,{day:'numeric',month:'long'})} bis ${fd(b,{day:'numeric',month:'long',year:'numeric'})}${S.settings.name?', '+esc(S.settings.name):''}</span></div>
+ <table><thead><tr><th style="width:40mm"></th>${days.map(ds=>`<th>${fd(ds,{weekday:'short'})}<br><small>${fd(ds)}</small></th>`).join('')}</tr></thead>
+ <tbody class="blk-daily">${dailyRows.map(rowHTML).join('')}</tbody>
+ <tbody class="blk-befinden">${befindenRows.map(rowHTML).join('')}
  <tr class="tall"><th>Beschwerden, Notizen<small>Kopfweh, Krämpfe, Schlaf …</small></th>${days.map(ds=>{const d=D(ds);return `<td style="font-size:7.5pt;text-align:left;vertical-align:top">${esc([...(d.sym||[]),d.note||''].filter(Boolean).join(', '))}</td>`}).join('')}</tr>
  </tbody></table>
- <div class="wk"><div>Bauchumfang (cm)${wv('waist','')}</div><div>Ruhepuls Ø (Garmin)${wv('rhr','')}</div><div>Schlaf Ø (h)${wv('sleep','')}</div><div>Stress Ø (Garmin)${wv('stress','')}</div><div>Schritte Ø pro Tag${wv('steps','')}</div><div>Wochennotiz<br>${esc(w.note||'')}</div></div>
+ <div class="wk-wrap"><div class="wk-label">Einmal pro Woche</div><div class="wk"><div>Bauchumfang (cm)${wv('waist','')}</div><div>Ruhepuls Ø (Garmin)${wv('rhr','')}</div><div>Schlaf Ø (h)${wv('sleep','')}</div><div>Stress Ø (Garmin)${wv('stress','')}</div><div>Schritte Ø pro Tag${wv('steps','')}</div><div>Wochennotiz<br>${esc(w.note||'')}</div></div></div>
  <p class="foot">Morgens messen, nach dem Aufstehen, vor Frühstück und Kaffee. Blutdruck sitzend nach 5 Minuten Ruhe. Einmal pro Woche ins Protokoll übertragen. · Keto-Protokoll v${VERSION}</p></div>`;
 }
 
@@ -511,8 +530,7 @@ function reportHTML(){
  const charts=chartSet().filter((_,i)=>i!==4&&i!==6);
  const talkingPoints=generateTalkingPoints();
  return `<div class="report">
- <h1>Keto-Protokoll: Zusammenfassung</h1>
- <p>${st.name?esc(st.name)+', ':''}Zeitraum ${fd(st.start,{day:'numeric',month:'long',year:'numeric'})} bis ${fd(end,{day:'numeric',month:'long',year:'numeric'})}. Einträge an ${inR.length} von ${N()} Tagen. Kohlenhydrat-Limit ${st.carbGoal} g/Tag.</p>
+ <div class="report-title"><p class="overline">Zusammenfassung</p><h1>Keto-Protokoll</h1><p class="subtitle">${st.name?esc(st.name)+' · ':''}Zeitraum ${fd(st.start,{day:'numeric',month:'long',year:'numeric'})} bis ${fd(end,{day:'numeric',month:'long',year:'numeric'})} · Einträge an ${inR.length} von ${N()} Tagen · Kohlenhydrat-Limit ${st.carbGoal} g/Tag</p></div>
  <h2>Verlauf im Überblick</h2>
  <p class="small">Mittelwerte der ersten und der letzten Woche mit Messwerten.</p>
  <table><thead><tr><th>Parameter</th><th>Einheit</th><th class="num">Anfang</th><th class="num">Ende</th><th class="num">Veränderung</th></tr></thead><tbody>
