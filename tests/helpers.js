@@ -21,7 +21,8 @@ function today() {
 // A minimal, fully-migrated empty state matching what load() produces.
 function blankState(overrides = {}) {
   return {
-    settings: { name: '', start: today(), days: 90, carbGoal: 50, questions: '', lastBackup: null, meds: [] },
+    dataVersion: 1,
+    settings: { name: '', start: today(), days: 90, carbGoal: 50, questions: '', lastBackup: null, meds: [], backupWarnDismissed: null },
     days: {},
     weeks: {},
     labs: [],
