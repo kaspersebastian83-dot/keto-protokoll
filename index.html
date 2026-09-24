@@ -4,6 +4,11 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title>Keto-Protokoll</title>
+<link rel="manifest" href="manifest.json">
+<link rel="apple-touch-icon" href="apple-touch-icon.png">
+<meta name="theme-color" content="#1D3A6B">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="default">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;500;600&display=swap" rel="stylesheet">
 <style id="pagestyle">@page{size:A4 portrait;margin:12mm}</style>
@@ -152,7 +157,7 @@ td.num,th.num{text-align:right}
 
 <script>
 const KEY='ketoProtokoll_v1';
-const VERSION='1.1.0';
+const VERSION='1.1.0'; // keep sw.js's CACHE_NAME suffix in sync with this by hand
 const SYMS=['Kopfschmerz','Müdigkeit','Muskelkrämpfe','Verdauung','Schwindel','Schlecht geschlafen','Heißhunger','Herzklopfen','Gereizt'];
 const DEFAULT_LABS=[['HbA1c','%'],['Glukose nüchtern','mg/dl'],['Gesamtcholesterin','mg/dl'],['LDL-Cholesterin','mg/dl'],['HDL-Cholesterin','mg/dl'],['Triglyzeride','mg/dl'],['Harnsäure','mg/dl'],['Kreatinin','mg/dl'],['eGFR','ml/min'],['GPT (ALT)','U/l'],['GOT (AST)','U/l'],['Gamma-GT','U/l'],['Natrium','mmol/l'],['Kalium','mmol/l'],['Magnesium','mmol/l'],['TSH','mU/l'],['CRP','mg/l']];
 const $=s=>document.querySelector(s);
@@ -605,6 +610,14 @@ function renderAll(){curWeek=Math.min(nWeeks(),Math.max(1,weekOf(today())));show
 
 $('#verline').textContent='v'+VERSION;
 load();renderAll();
+
+/* Registers sw.js for offline support. Only takes effect over HTTPS (e.g. GitHub
+   Pages) — 'serviceWorker' is undefined under file://, so this silently no-ops
+   there. sw.js's CACHE_NAME carries its own copy of VERSION; bump both by hand
+   together whenever VERSION changes, so every release invalidates the old cache. */
+if('serviceWorker' in navigator){
+ try{navigator.serviceWorker.register('sw.js').catch(()=>{})}catch(e){}
+}
 </script>
 </body>
 </html>

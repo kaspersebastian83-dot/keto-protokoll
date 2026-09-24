@@ -1,5 +1,6 @@
 # Personal health data – never commit backups or exports
 *.json
+!manifest.json
 *.csv
 backup/
 exports/
