@@ -26,11 +26,12 @@ header h1{font-weight:600;font-size:1.7rem;line-height:1.2;color:var(--ink);marg
 .nudge{font-size:.85rem;color:var(--s2);margin:4px 0 0}
 .nudge button{font:inherit;color:inherit;background:none;border:0;padding:0;text-decoration:underline;cursor:pointer}
 .strip{display:grid;grid-template-columns:repeat(30,1fr);gap:3px;margin:12px 0 16px}
-.strip button{aspect-ratio:1;border:1px solid var(--line);background:var(--field);border-radius:2px;padding:0;cursor:pointer;min-width:0}
+.strip button{aspect-ratio:1;border:1px solid var(--line);background:var(--field);border-radius:2px;padding:0;cursor:pointer;min-width:0;position:relative}
 .strip .part{background:var(--ketoBand);border-color:var(--keto)}
 .strip .done{background:var(--keto);border-color:var(--keto)}
 .strip .today{outline:2px solid var(--ink);outline-offset:1px}
 .strip .cur{border:2px solid var(--s2)}
+.strip .alert-dot{position:absolute;top:-2px;right:-2px;width:6px;height:6px;border-radius:50%;background:var(--warn)}
 nav{display:flex;gap:2px;overflow-x:auto;border-bottom:2px solid var(--ink);margin-bottom:16px;position:sticky;top:env(safe-area-inset-top,0px);background:var(--paper);z-index:5}
 nav button{border:0;background:none;padding:10px 12px;font:inherit;color:var(--muted);cursor:pointer;border-bottom:3px solid transparent;margin-bottom:-2px;white-space:nowrap}
 nav button[aria-selected="true"]{color:var(--ink);border-bottom-color:var(--ink);font-weight:600}
@@ -38,6 +39,9 @@ nav button[aria-selected="true"]{color:var(--ink);border-bottom-color:var(--ink)
 .panel h2{font-size:1.05rem;font-weight:600;color:var(--ink);margin:0 0 4px}
 .warnpanel{border:2px solid var(--warn)}
 .warnpanel p{color:var(--warn);font-weight:600;margin:0 0 10px}
+.warnpanel ul{margin:0 0 10px;padding-left:20px;color:var(--text);font-weight:400}
+.warnpanel li{margin:2px 0}
+.warnpanel p.small{color:var(--muted);font-weight:400;font-size:.85rem;margin:0}
 .row{display:grid;grid-template-columns:1fr 170px;align-items:center;gap:12px;padding:9px 0;border-bottom:1px dashed var(--line)}
 .row:last-child{border-bottom:0}
 .row.wide{grid-template-columns:1fr}
@@ -112,7 +116,7 @@ td.num,th.num{text-align:right}
 /* ===== fridge sheet ===== */
 .sheet table{table-layout:fixed;width:100%;border-collapse:collapse}
 .sheet th,.sheet td{padding:.35mm 2mm;color:#000}
-.sheet .band{background:var(--ink);color:#fff;padding:3mm 0;margin:0 0 3.5mm;display:flex;justify-content:space-between;align-items:center}
+.sheet .band{background:var(--ink);color:#fff;padding:2.6mm 0;margin:0 0 1.6mm;display:flex;justify-content:space-between;align-items:center}
 .sheet .band .l{display:flex;align-items:baseline}
 .sheet .band .r{color:#c3cfe4;font-size:9.2pt}
 .sheet .band .wk-title{font-family:"IBM Plex Serif",Georgia,serif;font-weight:600;font-size:19pt;color:#fff;display:inline;border:0;padding:0;margin:0}
@@ -131,12 +135,13 @@ td.num,th.num{text-align:right}
 .sheet .bp2{display:block;font-size:8.6pt;line-height:1.2}
 .sheet .ruled{background-image:repeating-linear-gradient(#fff 0 7.4mm,var(--hair) 7.4mm 7.6mm);background-position:0 4mm}
 .sheet tr.tall td.cell{height:15mm}
-.sheet .wk-wrap{border-top:.8pt solid var(--ink);margin-top:2.5mm;padding-top:1.2mm}
+.sheet .wk-wrap{border-top:.8pt solid var(--ink);margin-top:1.1mm;padding-top:.6mm}
 .sheet .wk-label{font-family:"IBM Plex Serif",Georgia,serif;font-size:9pt;font-weight:600;color:var(--ink);margin:0 0 1mm}
 .sheet .wk{display:grid;grid-template-columns:repeat(5,1fr) 2.2fr;gap:2mm}
 .sheet .wk div{border:.6pt solid #666;padding:.8mm 2mm;min-height:9mm;font-size:8.5pt;color:#333;line-height:1.2}
 .sheet .wk b{display:block;font-size:11pt;color:#000;margin-top:.5mm}
-.sheet .foot{font-size:7.5pt;color:#555;margin-top:1.2mm}
+.sheet .foot{font-size:7.5pt;color:#555;margin:1.2mm 0 0}
+.sheet .alert-foot{color:var(--warn);font-weight:600;margin:.4mm 0 0}
 
 /* ===== doctor report ===== */
 .report-title{margin-bottom:0}
@@ -211,7 +216,7 @@ td.num,th.num{text-align:right}
 
 <script>
 const KEY='ketoProtokoll_v1';
-const VERSION='1.4.0'; // keep sw.js's CACHE_NAME suffix in sync with this by hand
+const VERSION='1.5.0'; // keep sw.js's CACHE_NAME suffix in sync with this by hand
 const SYMS=['Kopfschmerz','Müdigkeit','Muskelkrämpfe','Verdauung','Schwindel','Schlecht geschlafen','Heißhunger','Herzklopfen','Gereizt'];
 const DEFAULT_LABS=[['HbA1c','%'],['Glukose nüchtern','mg/dl'],['Gesamtcholesterin','mg/dl'],['LDL-Cholesterin','mg/dl'],['HDL-Cholesterin','mg/dl'],['Triglyzeride','mg/dl'],['Harnsäure','mg/dl'],['Kreatinin','mg/dl'],['eGFR','ml/min'],['GPT (ALT)','U/l'],['GOT (AST)','U/l'],['Gamma-GT','U/l'],['Natrium','mmol/l'],['Kalium','mmol/l'],['Magnesium','mmol/l'],['TSH','mU/l'],['CRP','mg/l']];
 const REFERENCES=[
@@ -309,7 +314,7 @@ const vv=x=>x==null?'':String(x).replace('.',',');
 const uid=()=>'m'+Date.now().toString(36)+Math.random().toString(36).slice(2,7);
 
 let S;
-const DATA_VERSION=2;
+const DATA_VERSION=3;
 // Upgrades any older saved shape to the current one, step by step, and stamps
 // the result with DATA_VERSION. The single source of defaulting logic for
 // both load() and backup import — no other code should patch missing fields.
@@ -346,6 +351,11 @@ function migrate(data){
   if(day.dia!=null&&day.dia1==null)day.dia1=day.dia;
   recomputeBP(day);
  });
+ if(v<3)v=3;
+ // Doctor-agreed alert thresholds — never defaulted to a value, only ever
+ // what the user explicitly entered. Runs every load (not just while v<3) so
+ // a settings object missing it for any reason never crashes rendering.
+ if(!d.settings.alerts||typeof d.settings.alerts!=='object')d.settings.alerts={sysMin:null,sysMax:null,diaMin:null,diaMax:null,gMin:null,gMax:null,pMin:null,pMax:null,action:''};
  d.dataVersion=v;
  return d;
 }
@@ -401,6 +411,44 @@ function recomputeBP(d){
 }
 function bpReadingMsg(sys,dia){return checkPlausibility('sys',sys,dia)||checkPlausibility('dia',dia,null)||''}
 function bpDiffMsg(d){return (d.sys1!=null&&d.sys2!=null&&Math.abs(d.sys1-d.sys2)>15)?'Messungen weichen stark ab — evtl. eine dritte Messung':''}
+// Doctor-agreed alert thresholds. Never defaulted — only ever what the user
+// entered in Einstellungen. A reminder of the doctor's own instructions, not
+// a medical assessment, so wording stays neutral throughout.
+// S.settings.alerts may be absent on archived data (a snapshot from before
+// this feature existed, or from another pre-migrate() source) — guard
+// against that rather than requiring every historical snapshot to migrate.
+function hasAlertsSet(){const al=S.settings.alerts;if(!al)return false;return ['sysMin','sysMax','diaMin','diaMax','gMin','gMax','pMin','pMax'].some(k=>al[k]!=null)}
+// Checks every individual BP reading (not the averaged sys/dia — a single low
+// reading on BP medication matters on its own), plus glucose and pulse.
+function checkAlerts(d){
+ const al=S.settings.alerts||{},hits=[];
+ const check=(label,val,minK,maxK,unit)=>{
+  if(val==null)return;
+  if(al[minK]!=null&&val<al[minK])hits.push({label,value:val,limit:al[minK],dir:'min',unit});
+  if(al[maxK]!=null&&val>al[maxK])hits.push({label,value:val,limit:al[maxK],dir:'max',unit});
+ };
+ check('Blutdruck systolisch, 1. Messung',d.sys1,'sysMin','sysMax','mmHg');
+ check('Blutdruck diastolisch, 1. Messung',d.dia1,'diaMin','diaMax','mmHg');
+ check('Blutdruck systolisch, 2. Messung',d.sys2,'sysMin','sysMax','mmHg');
+ check('Blutdruck diastolisch, 2. Messung',d.dia2,'diaMin','diaMax','mmHg');
+ check('Blutzucker',d.g,'gMin','gMax','mg/dl');
+ check('Puls',d.p,'pMin','pMax','/min');
+ return hits;
+}
+function alertHitText(h){return `${h.label}: ${fmt(h.value,0)} ${h.unit} (vereinbarte Grenze ${h.dir==='min'?'min':'max'} ${fmt(h.limit,0)} ${h.unit})`}
+// One compact line for print surfaces (fridge sheet footer, report), e.g.
+// "Vereinbarte Grenzen: RR sys 100–160, dia 60–100 · BZ 70–180 → Praxis anrufen".
+function alertsSummaryText(){
+ const al=S.settings.alerts,parts=[];
+ const range=(min,max)=>`${min??'–'}–${max??'–'}`;
+ const sys=al.sysMin!=null||al.sysMax!=null?`sys ${range(al.sysMin,al.sysMax)}`:null;
+ const dia=al.diaMin!=null||al.diaMax!=null?`dia ${range(al.diaMin,al.diaMax)}`:null;
+ if(sys||dia)parts.push(`RR ${[sys,dia].filter(Boolean).join(', ')}`);
+ if(al.gMin!=null||al.gMax!=null)parts.push(`BZ ${range(al.gMin,al.gMax)}`);
+ if(al.pMin!=null||al.pMax!=null)parts.push(`Puls ${range(al.pMin,al.pMax)}`);
+ if(!parts.length)return '';
+ return `Vereinbarte Grenzen: ${parts.join(' · ')}${al.action?` → ${al.action}`:''}`;
+}
 function medAdherence(from,to,medId){let taken=0,logged=0;for(let i=0;i<=diffDays(from,to);i++){const d=S.days[addDays(from,i)];if(d&&d.meds&&d.meds[medId]!==undefined){logged++;if(d.meds[medId])taken++}}return {taken,logged}}
 // null: never backed up. Otherwise days since the last export.
 function daysSinceBackup(){return S.settings.lastBackup?diffDays(S.settings.lastBackup,today()):null}
@@ -428,9 +476,11 @@ let curWeek=1;
 function renderHead(){
  const st=S.settings,t=today(),i=diffDays(st.start,t)+1;
  $('#hsub').textContent=(st.name?st.name+', ':'')+(i<1?`Start am ${fd(st.start,{day:'numeric',month:'long'})}`:i>N()?`Zeitraum abgeschlossen (${N()} Tage)`:`Tag ${i} von ${N()}, Woche ${Math.ceil(i/7)}`);
+ const alertsSet=hasAlertsSet();
  let h='';
  for(let k=0;k<N();k++){const ds=addDays(st.start,k),d=S.days[ds];const n=d?['w','g','k','sys','c'].filter(f=>d[f]!=null).length:0;
-  h+=`<button type="button" data-date="${ds}" class="${n>=4?'done':n?'part':''}${ds===t?' today':''}${ds===curDate&&curTab==='day'?' cur':''}" title="Tag ${k+1}, ${fd(ds)}" aria-label="Tag ${k+1}, ${fd(ds)}"></button>`}
+  const flagged=alertsSet&&d&&checkAlerts(d).length>0;
+  h+=`<button type="button" data-date="${ds}" class="${n>=4?'done':n?'part':''}${ds===t?' today':''}${ds===curDate&&curTab==='day'?' cur':''}" title="Tag ${k+1}, ${fd(ds)}" aria-label="Tag ${k+1}, ${fd(ds)}${flagged?', außerhalb vereinbarter Grenze':''}">${flagged?'<span class="alert-dot"></span>':''}</button>`}
  $('#strip').innerHTML=h;
  const nd=$('#nudge');
  const remaining=N()-i;
@@ -483,10 +533,25 @@ function backupWarnHTML(){
  const lb=daysSinceBackup();
  return `<div class="panel warnpanel" id="backupWarn"><p>${lb===null?'Noch kein Backup gemacht':`Letztes Backup vor ${lb} Tagen`} — die Daten liegen nur in diesem Browser.</p><div class="btns"><button type="button" class="btn primary" id="backupWarnExp">Jetzt sichern</button><button type="button" class="btn" id="backupWarnDismiss">Für heute ausblenden</button></div></div>`;
 }
+function alertPanelHTML(hits){
+ const action=S.settings.alerts.action;
+ return `<div class="panel warnpanel" id="alertWarn"><p>Außerhalb der mit dem Arzt vereinbarten Grenze</p><ul>${hits.map(h=>`<li>${esc(alertHitText(h))}</li>`).join('')}</ul>${action?`<p class="small">${esc(action)}</p>`:''}</div>`;
+}
+// Called after any value that feeds checkAlerts() changes, so the panel
+// reflects the crossing live without a full renderDay() (which would be
+// disruptive mid-edit for the fields that trigger on blur).
+function updateAlertPanel(d){
+ const hits=checkAlerts(d),existing=$('#alertWarn');
+ if(hits.length){
+  if(existing)existing.outerHTML=alertPanelHTML(hits);
+  else $('#v-day').insertAdjacentHTML('afterbegin',alertPanelHTML(hits));
+ }else if(existing)existing.remove();
+}
 function renderDay(){
  const d=S.days[curDate]||{},i=diffDays(S.settings.start,curDate),inR=i>=0&&i<N();
  const showBackupWarn=backupUrgency()==='critical'&&S.settings.backupWarnDismissed!==today();
- let h=`${showBackupWarn?backupWarnHTML():''}<div class="datebar"><button type="button" class="btn" data-nav="-1" aria-label="Vorheriger Tag">‹</button><input type="date" id="dpick" value="${curDate}" aria-label="Datum"><button type="button" class="btn" data-nav="1" aria-label="Nächster Tag">›</button>${curDate!==today()?'<button type="button" class="btn" data-nav="0">Heute</button>':''}</div>
+ const alertHits=checkAlerts(d);
+ let h=`${alertHits.length?alertPanelHTML(alertHits):''}${showBackupWarn?backupWarnHTML():''}<div class="datebar"><button type="button" class="btn" data-nav="-1" aria-label="Vorheriger Tag">‹</button><input type="date" id="dpick" value="${curDate}" aria-label="Datum"><button type="button" class="btn" data-nav="1" aria-label="Nächster Tag">›</button>${curDate!==today()?'<button type="button" class="btn" data-nav="0">Heute</button>':''}</div>
  <p class="sub" style="margin-bottom:12px">${fd(curDate,{weekday:'long',day:'numeric',month:'long'})}${inR?`, Tag ${i+1}`:', außerhalb des Zeitraums'}</p>
  <div class="panel"><h2>Morgens, nüchtern</h2>
  ${numRow('w','Gewicht','nach dem Aufstehen','kg',d,'decimal',plausMsg('w',d))}
@@ -521,6 +586,7 @@ $('#v-day').addEventListener('change',e=>{
  if(t.dataset.f){
   if(BP_READING_FIELDS.includes(t.dataset.f))updateBPUI(d);
   else updateHint(t.dataset.f,d);
+  updateAlertPanel(d);
  }
 });
 $('#v-day').addEventListener('click',e=>{
@@ -730,7 +796,8 @@ function sheetHTML(wn,fill){
  <tr class="tall"><th class="rowlabel">Beschwerden, Notizen<small>Kopfweh, Krämpfe, Schlaf …</small></th>${days.map(ds=>{const d=D(ds);return `<td class="cell ruled" style="font-size:7.5pt;text-align:left;vertical-align:top">${esc([...(d.sym||[]),d.note||''].filter(Boolean).join(', '))}</td>`}).join('')}</tr>
  </tbody></table>
  <div class="wk-wrap"><div class="wk-label">Einmal pro Woche</div><div class="wk"><div>Bauchumfang (cm)${wv('waist','')}</div><div>Ruhepuls Ø, Garmin${wv('rhr','')}</div><div>Schlaf Ø (h)${wv('sleep','')}</div><div>Stress Ø, Garmin${wv('stress','')}</div><div>Schritte Ø pro Tag${wv('steps','')}</div><div class="ruled">Wochennotiz<br>${esc(w.note||'')}</div></div></div>
- <p class="foot">Morgens messen, nach dem Aufstehen, vor Frühstück und Kaffee. Blutdruck sitzend nach 5 Minuten Ruhe. Einmal pro Woche ins Protokoll übertragen. · Keto-Protokoll v${VERSION}</p></div>`;
+ <p class="foot">Morgens messen, nach dem Aufstehen, vor Frühstück und Kaffee. Blutdruck sitzend nach 5 Minuten Ruhe. Einmal pro Woche ins Protokoll übertragen. · Keto-Protokoll v${VERSION}</p>
+ ${hasAlertsSet()?`<p class="foot alert-foot">${esc(alertsSummaryText())}</p>`:''}</div>`;
 }
 
 function generateTalkingPoints(){
@@ -824,6 +891,7 @@ function reportHTML(){
  const kd=days.filter(d=>d.k!=null),kin=kd.filter(d=>d.k>=0.5).length;
  const cd=days.filter(d=>d.c!=null),cOver=cd.filter(d=>d.c>st.carbGoal).length;
  const bpDays=days.filter(d=>d.sys1!=null||d.sys2!=null),bpTwo=bpDays.filter(d=>d.sys1!=null&&d.sys2!=null).length,bpOne=bpDays.length-bpTwo;
+ const alertRows=hasAlertsSet()?inR.flatMap(([ds,d])=>checkAlerts(d).map(h=>({ds,...h}))).sort((a,b)=>a.ds<b.ds?-1:a.ds>b.ds?1:0):[];
  const months=Math.ceil(N()/30);
  const symC=SYMS.map(s=>{const c=Array(months).fill(0);inR.forEach(([ds,d])=>{if((d.sym||[]).includes(s))c[Math.floor(diffDays(st.start,ds)/30)]++});return [s,c]}).filter(([,c])=>c.some(Boolean));
  const labs=S.labs.filter(r=>r.base||r.end);
@@ -862,6 +930,9 @@ function reportHTML(){
  <h2>Beschwerden</h2>
  ${symC.length?`<table class="data"><thead><tr><th>Beschwerde</th>${Array.from({length:months},(_,i)=>`<th class="num">Tage ${i*30+1}–${Math.min((i+1)*30,N())}</th>`).join('')}</tr></thead><tbody>${symC.map(([s,c])=>`<tr><td>${s}</td>${c.map(x=>`<td class="num">${x||''}</td>`).join('')}</tr>`).join('')}</tbody></table>`:'<p>Keine Beschwerden notiert.</p>'}
  ${wn.length||dn.length?`<h2>Notizen</h2>${wn.map(n=>`<p><b>Woche ${n}:</b> ${esc(S.weeks[n].note)}</p>`).join('')}${dn.length?`<p class="small" style="margin-top:2mm">${dn.map(([ds,d])=>`<b>${fd(ds)}</b> ${esc(d.note)}`).join(' &nbsp; ')}</p>`:''}`:''}
+ ${hasAlertsSet()?`<h2>Vereinbarte Grenzwerte</h2>
+ <p>${esc(alertsSummaryText())}</p>
+ ${alertRows.length?`<table class="data"><thead><tr><th>Datum</th><th>Wert</th><th>Grenze überschritten</th></tr></thead><tbody>${alertRows.map(r=>`<tr><td>${fd(r.ds)}</td><td>${esc(r.label)}: ${fmt(r.value,0)} ${r.unit}</td><td>${r.dir==='min'?'min':'max'} ${fmt(r.limit,0)} ${r.unit}</td></tr>`).join('')}</tbody></table>`:'<p>Keine Überschreitung im Zeitraum.</p>'}`:''}
  <h2>Beobachtungen für das Gespräch</h2>
  <div class="callout">
  <p class="note">Beobachtungen aus den erfassten Daten, keine medizinische Bewertung — als Gesprächsgrundlage gedacht.</p>
@@ -892,6 +963,9 @@ $('#v-print').addEventListener('click',e=>{
 
 /* ---------- settings ---------- */
 function download(name,text,type){const a=document.createElement('a');a.href=URL.createObjectURL(new Blob([text],{type}));a.download=name;document.body.appendChild(a);a.click();setTimeout(()=>{URL.revokeObjectURL(a.href);a.remove()},800)}
+function alertRow(minK,maxK,label,unit,al){
+ return `<div class="row"><label for="al_${minK}"><b>${label}</b><small>${unit}</small></label><div class="inp"><input id="al_${minK}" data-al="${minK}" type="text" inputmode="numeric" placeholder="min" value="${vv(al[minK])}" aria-label="${label}, minimum"><span>–</span><input data-al="${maxK}" type="text" inputmode="numeric" placeholder="max" value="${vv(al[maxK])}" aria-label="${label}, maximum"></div></div>`;
+}
 function renderSet(){
  const st=S.settings;
  const archiveRows=[...Array(S.archive.length).keys()].reverse().map(idx=>{
@@ -909,6 +983,13 @@ function renderSet(){
  <div class="panel scroll"><h2>Medikamente</h2><p class="sub">Einmal definieren, im Tagesprotokoll täglich abhaken.</p><table class="labtbl"><thead><tr><th>Name</th><th>Dosis</th><th>Kategorie</th><th></th><th></th></tr></thead><tbody>
  ${st.meds.map((m,i)=>`<tr><td><input data-mi="${i}" data-mk="name" value="${esc(m.name)}" aria-label="Name"></td><td style="width:100px"><input data-mi="${i}" data-mk="dose" value="${esc(m.dose)}" aria-label="Dosis"></td><td style="width:150px"><select data-mi="${i}" data-mk="category" aria-label="Kategorie"><option value="Medikament" ${m.category==='Medikament'?'selected':''}>Medikament</option><option value="Nahrungsergänzung" ${m.category==='Nahrungsergänzung'?'selected':''}>Nahrungsergänzung</option></select></td><td style="width:100px"><button type="button" class="btn" data-mdose="${i}" style="padding:4px 8px;font-size:.85rem">Dosis geändert</button></td><td style="width:36px"><button type="button" class="btn" data-mdel="${i}" aria-label="${esc(m.name)} entfernen" style="padding:4px 8px">✕</button></td></tr>`).join('')}
  </tbody></table><div class="btns"><button type="button" class="btn" id="medAdd">Medikament hinzufügen</button></div></div>
+ <div class="panel"><h2>Mit dem Arzt vereinbarte Grenzwerte</h2><p class="sub">Nur Werte eintragen, die du mit deinem Arzt abgesprochen hast.</p>
+ ${alertRow('sysMin','sysMax','Blutdruck systolisch','mmHg',st.alerts)}
+ ${alertRow('diaMin','diaMax','Blutdruck diastolisch','mmHg',st.alerts)}
+ ${alertRow('gMin','gMax','Blutzucker','mg/dl',st.alerts)}
+ ${alertRow('pMin','pMax','Puls','/min',st.alerts)}
+ <div class="row wide"><label for="al_action"><b>Vorgehen bei Überschreitung</b><small>z. B. „Praxis anrufen: 02452 …”, erscheint auf Blatt und Bericht</small></label><input id="al_action" data-al="action" value="${esc(st.alerts.action)}"></div>
+ </div>
  <div class="panel"><h2>Backup</h2><p class="sub">Die Daten liegen nur in diesem Browser. Sichere sie regelmäßig, und übertrage sie so auch zwischen Handy und Rechner.${st.lastBackup?` Letztes Backup: ${fd(st.lastBackup,{day:'numeric',month:'long'})}.`:''}</p>
  <p class="sub" id="storageLine">${storageStatusLine()}</p>
  <div class="btns"><button type="button" class="btn primary" id="exp">Backup speichern</button><button type="button" class="btn" id="imp">Backup laden</button><button type="button" class="btn" id="csv">Tageswerte als CSV</button></div></div>
@@ -917,6 +998,12 @@ function renderSet(){
 }
 $('#v-set').addEventListener('change',e=>{
  const t=e.target,k=t.dataset.s;
+ if(t.dataset.al){
+  const ak=t.dataset.al;
+  if(ak==='action')S.settings.alerts.action=t.value.trim();
+  else{const n=num(t.value);S.settings.alerts[ak]=(t.value.trim()===''||n===null)?null:n}
+  save();renderHead();return;
+ }
  if(k){
   if(k==='days'||k==='carbGoal'){const n=num(t.value);if(n==null||n<=0){status('Bitte eine Zahl eingeben');return}S.settings[k]=Math.round(n)}
   else if(k==='start'){if(!t.value)return;S.settings.start=t.value}

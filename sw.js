@@ -3,7 +3,7 @@
 // CACHE_NAME's version suffix must be kept in sync BY HAND with the VERSION
 // constant in index.html. Bump both together whenever VERSION changes —
 // that's what invalidates the old cache and lets a new version replace it.
-const CACHE_NAME = 'keto-protokoll-v1.4.0';
+const CACHE_NAME = 'keto-protokoll-v1.5.0';
 
 const PRECACHE_URLS = [
   './index.html',
