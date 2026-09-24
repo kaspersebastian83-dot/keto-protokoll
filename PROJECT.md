@@ -264,7 +264,7 @@ Preferred workflow:
 - [x] Add `PROJECT.md`
 - [x] Update `README.md`
 - [x] Review obsolete development branches
-- [ ] Adopt feature-branch and pull-request workflow
+- [x] Adopt feature-branch and pull-request workflow
 
 ### Future development
 

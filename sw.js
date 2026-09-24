@@ -1,9 +1,8 @@
 // Minimal service worker for offline support.
 //
-// CACHE_NAME's version suffix must be kept in sync BY HAND with the VERSION
-// constant in index.html. Bump both together whenever VERSION changes —
-// that's what invalidates the old cache and lets a new version replace it.
-const CACHE_NAME = 'keto-protokoll-v1.5.0';
+// Keep CACHE_NAME's version synchronized with index.html, package.json, and
+// package-lock.json so each release replaces the old service-worker cache.
+const CACHE_NAME = 'keto-protokoll-v1.5.1';
 
 const PRECACHE_URLS = [
   './index.html',
@@ -29,11 +28,6 @@ self.addEventListener('activate', event => {
 });
 
 self.addEventListener('fetch', event => {
-  const url = new URL(event.request.url);
-
-  // Never intercept the Google Fonts request — offline, let it fail naturally;
-  // the app's CSS already falls back to system-ui.
-  if (url.hostname === 'fonts.googleapis.com' || url.hostname === 'fonts.gstatic.com') return;
   if (event.request.method !== 'GET') return;
 
   event.respondWith(
