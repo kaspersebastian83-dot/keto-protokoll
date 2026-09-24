@@ -1,12 +1,12 @@
 # Keto-Protokoll
 
-Single-file offline web app for logging a 3-month ketogenic diet trial:
-daily morning values, weekly Garmin averages, lab values before/after,
-a printable weekly fridge sheet and a summary report for the final doctor's appointment.
+Single-file offline-capable web app for documenting a ketogenic diet trial:
+daily and weekly measurements, laboratory values, medication adherence and trends,
+with a printable weekly fridge sheet and a report for discussion with a doctor.
 
 ## Usage
 
-Open `index.html` in a browser – no build step, no dependencies.
+Open `index.html` in a browser – no build step or runtime dependencies.
 Or use the GitHub Pages version to open it on the phone and install it as an app (see below).
 
 ## Install as an app (PWA)
@@ -36,10 +36,16 @@ it silently, no PWA install prompt and no offline support in that case.
 
 ## Features
 
-- Daily: weight, fasting glucose, blood ketones, blood pressure, pulse, carbs, energy/hunger (1–5), plan adherence, symptoms, note
-- Weekly: waist, resting HR, sleep, stress, steps (Garmin), note
-- Lab table with baseline/final values and deltas
-- Charts (inline SVG)
-- Print: weekly A4 landscape fridge sheet (blank or pre-filled), summary report (A4 portrait / PDF)
-- JSON backup/restore, CSV export
-- Installable as a home-screen app with offline support (PWA, HTTPS only)
+- Daily tracking: weight, fasting glucose, blood ketones, two morning blood-pressure readings with a derived daily average, pulse, carbohydrates, energy and hunger, plan adherence, symptoms and notes, and medication adherence
+- Weekly tracking: waist, resting heart rate, sleep, stress, steps, and weekly notes
+- Laboratory tracking: baseline and follow-up values, reference ranges, and changes over time
+- Trends: longitudinal charts, linear trend fitting, a two-variable comparison chart, and summary tables
+- Medication tracking: medications and supplements, daily adherence, and dose-change history
+- Doctor-agreed alert thresholds
+- Tracking periods: extend an active period, archive completed periods, start a new period, and regenerate reports for archived periods
+- Literature: curated references, reading progress, and references included in the doctor report
+- Print: weekly A4 landscape fridge sheet, final doctor report, and saving as PDF through the browser print dialog
+- Data safety: local-only storage, JSON backup and restore, CSV export, schema migration, backup reminders, and persistent-storage request where supported
+- Installable PWA: home-screen installation, offline support, and GitHub Pages compatibility
+- Automated Playwright regression tests
+- GitHub Actions CI
