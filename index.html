@@ -398,6 +398,48 @@ function chart(title,series,o={}){
 function doseMarkers(){
  return S.doseChanges.map(c=>{const m=S.settings.meds.find(x=>x.id===c.medId);return {x:diffDays(S.settings.start,c.date),label:`${m?m.name:'Medikament'} → ${c.newDose}`}});
 }
+const METRICS=[
+ {id:'w',label:'Gewicht',unit:'kg',src:'day'},
+ {id:'g',label:'Blutzucker',unit:'mg/dl',src:'day'},
+ {id:'k',label:'Ketone',unit:'mmol/l',src:'day'},
+ {id:'sys',label:'Blutdruck systolisch',unit:'mmHg',src:'day'},
+ {id:'dia',label:'Blutdruck diastolisch',unit:'mmHg',src:'day'},
+ {id:'p',label:'Puls',unit:'/min',src:'day'},
+ {id:'c',label:'Kohlenhydrate',unit:'g',src:'day'},
+ {id:'en',label:'Energie',unit:'1–5',src:'day'},
+ {id:'hu',label:'Hunger',unit:'1–5',src:'day'},
+ {id:'waist',label:'Bauchumfang',unit:'cm',src:'week'},
+ {id:'rhr',label:'Ruhepuls',unit:'/min',src:'week'},
+ {id:'sleep',label:'Schlaf',unit:'h',src:'week'},
+ {id:'stress',label:'Stress',unit:'0–100',src:'week'},
+ {id:'steps',label:'Schritte',unit:'/Tag',src:'week'}
+];
+const metricPts=m=>m.src==='day'?ser(m.id):wser(m.id);
+function chart2(labelA,ptsA,unitA,labelB,ptsB,unitB){
+ const cap=`<figcaption>${labelA} <span class="sub">(${unitA})</span> / ${labelB} <span class="sub">(${unitB})</span></figcaption>`;
+ if(!ptsA.length||!ptsB.length)return `<figure class="chart">${cap}<p class="sub">Für diese Kombination liegen noch keine gemeinsamen Werte vor.</p></figure>`;
+ const n=N(),W=600,H=170,L=44,R=44,T=10,B=22;
+ const scaleFor=pts=>{const ys=pts.map(p=>p[1]);let lo=Math.min(...ys),hi=Math.max(...ys),pad=(hi-lo)*.15;if(!pad)pad=Math.abs(hi)*.05||1;lo-=pad;hi+=pad;return {lo,hi}};
+ const sa=scaleFor(ptsA),sb=scaleFor(ptsB);
+ const X=x=>L+x/(n-1)*(W-L-R);
+ const YA=y=>T+(1-(y-sa.lo)/(sa.hi-sa.lo))*(H-T-B);
+ const YB=y=>T+(1-(y-sb.lo)/(sb.hi-sb.lo))*(H-T-B);
+ const decA=sa.hi-sa.lo<3?2:sa.hi-sa.lo<15?1:0,decB=sb.hi-sb.lo<3?2:sb.hi-sb.lo<15?1:0;
+ let g='';
+ for(let i=0;i<=4;i++){
+  const ya=sa.lo+(sa.hi-sa.lo)*i/4,pya=YA(ya).toFixed(1);
+  g+=`<line class="gl" x1="${L}" x2="${W-R}" y1="${pya}" y2="${pya}"/><text x="${L-6}" y="${+pya+4}" text-anchor="end">${fmt(ya,decA)}</text>`;
+  const yb=sb.lo+(sb.hi-sb.lo)*i/4,pyb=YB(yb).toFixed(1);
+  g+=`<text x="${W-R+6}" y="${+pyb+4}" text-anchor="start">${fmt(yb,decB)}</text>`;
+ }
+ for(let w=0;w*7<n;w+=2)g+=`<text x="${X(w*7).toFixed(1)}" y="${H-5}">W${w+1}</text>`;
+ const drawSeries=(pts,Y,cls)=>{const sp=[...pts].sort((a,b)=>a[0]-b[0]);
+  g+=`<path class="${cls}" d="M${sp.map(p=>X(p[0]).toFixed(1)+','+Y(p[1]).toFixed(1)).join('L')}"/>`;
+  g+=sp.map(p=>`<circle class="${cls}d" r="2.6" cx="${X(p[0]).toFixed(1)}" cy="${Y(p[1]).toFixed(1)}"/>`).join('')};
+ drawSeries(ptsA,YA,'s1');
+ drawSeries(ptsB,YB,'s2');
+ return `<figure class="chart">${cap}<svg viewBox="0 0 ${W} ${H}" role="img" aria-label="${labelA} / ${labelB}">${g}</svg><p class="sub" style="color:var(--ink)"><span class="key" style="background:var(--ink)"></span>${labelA} (${unitA})</p><p class="sub" style="color:var(--s2)"><span class="key" style="background:var(--s2)"></span>${labelB} (${unitB})</p></figure>`;
+}
 function chartSet(){
  return [
   chart('Gewicht',[{pts:ser('w'),cls:'s1'}],{unit:'kg'}),
@@ -409,7 +451,21 @@ function chartSet(){
   chart('Bauchumfang',[{pts:wser('waist'),cls:'s1'}],{unit:'cm'})
  ];
 }
-function renderTrend(){$('#v-trend').innerHTML=`<div class="panel">${chartSet().join('')}</div>`}
+function compareChartHTML(idA,idB){
+ const a=METRICS.find(m=>m.id===idA),b=METRICS.find(m=>m.id===idB);
+ if(!a||!b)return '';
+ return chart2(a.label,metricPts(a),a.unit,b.label,metricPts(b),b.unit);
+}
+function renderTrend(){
+ $('#v-trend').innerHTML=`<div class="panel">${chartSet().join('')}</div>
+ <div class="panel"><h2>Vergleich zweier Werte</h2>
+ <div class="row"><label for="cmpA"><b>Wert A</b></label><select id="cmpA">${METRICS.map(m=>`<option value="${m.id}"${m.id==='c'?' selected':''}>${m.label}</option>`).join('')}</select></div>
+ <div class="row"><label for="cmpB"><b>Wert B</b></label><select id="cmpB">${METRICS.map(m=>`<option value="${m.id}"${m.id==='k'?' selected':''}>${m.label}</option>`).join('')}</select></div>
+ <div id="cmpChart">${compareChartHTML('c','k')}</div></div>`;
+}
+$('#v-trend').addEventListener('change',e=>{
+ if(e.target.id==='cmpA'||e.target.id==='cmpB')$('#cmpChart').innerHTML=compareChartHTML($('#cmpA').value,$('#cmpB').value);
+});
 
 /* ---------- print ---------- */
 function doPrint(html,landscape){
