@@ -235,6 +235,15 @@ const weekOf=ds=>Math.floor(diffDays(S.settings.start,ds)/7)+1;
 function avg(from,to,f){const a=[];for(let i=0;i<=diffDays(from,to);i++){const d=S.days[addDays(from,i)];if(d&&d[f]!=null)a.push(d[f])}return a.length?a.reduce((x,y)=>x+y,0)/a.length:null}
 function countLogged(from,to,f){let n=0;for(let i=0;i<=diffDays(from,to);i++){const d=S.days[addDays(from,i)];if(d&&d[f]!=null)n++}return n}
 function prevLoggedValue(field,beforeDate){const dates=Object.keys(S.days).filter(ds=>ds<beforeDate&&S.days[ds][field]!=null).sort();return dates.length?S.days[dates[dates.length-1]][field]:null}
+function trendFit(pairs){
+ const n=pairs.length;
+ if(n<3)return null;
+ const xbar=pairs.reduce((s,p)=>s+p[0],0)/n,ybar=pairs.reduce((s,p)=>s+p[1],0)/n;
+ let num=0,den=0;
+ pairs.forEach(([x,y])=>{num+=(x-xbar)*(y-ybar);den+=(x-xbar)*(x-xbar)});
+ const b=den===0?0:num/den;
+ return {a:ybar-b*xbar,b,n};
+}
 function checkPlausibility(field,value,ref){
  if(value==null)return null;
  const RANGES={w:[30,250],g:[40,300],k:[0,8],sys:[70,220],dia:[40,130],p:[30,200],c:[0,300]};
@@ -601,7 +610,16 @@ function reportHTML(){
  const inR=Object.entries(S.days).filter(([ds,d])=>{const i=diffDays(st.start,ds);return i>=0&&i<N()&&Object.keys(d).length});
  const firstLast=f=>{let fi=null,la=null;for(let w=1;w<=nWeeks();w++){const [a,b]=weekRange(w);const v=avg(a,b,f);if(v!=null){if(!fi)fi=[w,v];la=[w,v]}}return [fi,la]};
  const wfl=f=>{const ws=Object.keys(S.weeks).map(Number).filter(n=>S.weeks[n][f]!=null).sort((a,b)=>a-b);return ws.length?[[ws[0],S.weeks[ws[0]][f]],[ws.at(-1),S.weeks[ws.at(-1)][f]]]:[null,null]};
- const row=(l,u,d,[fi,la])=>`<tr><td>${l}</td><td>${u}</td><td class="num">${fi?fmt(fi[1],d)+` <span class="small">(W${fi[0]})</span>`:'–'}</td><td class="num">${la&&la[0]!==fi[0]?fmt(la[1],d)+` <span class="small">(W${la[0]})</span>`:'–'}</td><td class="num">${fi&&la&&la[0]!==fi[0]?((la[1]-fi[1])>0?'+':(la[1]-fi[1])<0?'−':'±')+fmt(Math.abs(la[1]-fi[1]),d):''}</td></tr>`;
+ const weeklyPairsDay=f=>{const p=[];for(let w=1;w<=nWeeks();w++){const [a,b]=weekRange(w);const v=avg(a,b,f);if(v!=null)p.push([w,v])}return p};
+ const weeklyPairsWeek=f=>Object.keys(S.weeks).map(Number).filter(n=>S.weeks[n][f]!=null).sort((a,b)=>a-b).map(n=>[n,S.weeks[n][f]]);
+ const trendRow=(l,u,d,pairs)=>{
+  const t=trendFit(pairs);
+  if(!t)return `<tr><td>${l}</td><td>${u}</td><td class="num">–</td><td class="num">–</td><td class="num">zu wenige Wochen</td></tr>`;
+  const xFirst=pairs[0][0],xLast=pairs.at(-1)[0];
+  const yFirst=t.a+t.b*xFirst,yLast=t.a+t.b*xLast,dv=yLast-yFirst;
+  const sign=dv>0?'+':dv<0?'−':'±';
+  return `<tr><td>${l}</td><td>${u}</td><td class="num">${fmt(yFirst,d)} <span class="small">(W${xFirst})</span></td><td class="num">${fmt(yLast,d)} <span class="small">(W${xLast})</span></td><td class="num">${sign}${fmt(Math.abs(dv),d)}</td></tr>`;
+ };
  const DR=[['Gewicht','w','kg',1],['Blutzucker nüchtern','g','mg/dl',0],['Ketone','k','mmol/l',2],['Blutdruck systolisch','sys','mmHg',0],['Blutdruck diastolisch','dia','mmHg',0],['Puls','p','/min',0],['Kohlenhydrate','c','g/Tag',0],['Energie (1–5)','en','',1],['Hunger (1–5)','hu','',1]];
  const WR=[['Bauchumfang','waist','cm',1],['Ruhepuls (Garmin)','rhr','/min',0],['Schlaf (Garmin)','sleep','h',1],['Stress (Garmin)','stress','0–100',0],['Schritte (Garmin)','steps','/Tag',0]];
  const days=inR.map(e=>e[1]);
@@ -629,9 +647,9 @@ function reportHTML(){
  <div class="report-title"><span class="tag">Auswertung, ${monthsApprox} ${monthsApprox===1?'Monat':'Monate'}</span><h1>Keto-Protokoll</h1><p class="subtitle">${st.name?esc(st.name)+' — ':''}${fd(st.start,{day:'numeric',month:'long',year:'numeric'})} bis ${fd(end,{day:'numeric',month:'long',year:'numeric'})}, Einträge an ${inR.length} von ${N()} Tagen</p><div class="rule"></div>
  <table class="stats"><tr><td>${wStat}</td><td>${bpStat}</td><td>${ketoneStat}</td></tr></table></div>
  <h2>Verlauf im Überblick</h2>
- <p class="small">Mittelwerte der ersten und der letzten Woche mit Messwerten.</p>
- <table class="data"><thead><tr><th>Parameter</th><th>Einheit</th><th class="num">Anfang</th><th class="num">Ende</th><th class="num">Veränderung</th></tr></thead><tbody>
- ${DR.map(([l,f,u,d])=>row(l,u,d,firstLast(f))).join('')}${WR.map(([l,f,u,d])=>row(l,u,d,wfl(f))).join('')}</tbody></table>
+ <table class="data"><thead><tr><th>Parameter</th><th>Einheit</th><th class="num">Anfang (Trend)</th><th class="num">Ende (Trend)</th><th class="num">Veränderung</th></tr></thead><tbody>
+ ${DR.map(([l,f,u,d])=>trendRow(l,u,d,weeklyPairsDay(f))).join('')}${WR.map(([l,f,u,d])=>trendRow(l,u,d,weeklyPairsWeek(f))).join('')}</tbody></table>
+ <p class="small">Anfang und Ende basieren auf dem linearen Trend über alle Wochen mit Daten, nicht auf einzelnen Wochenwerten, damit einzelne ungewöhnliche Wochen das Ergebnis nicht verzerren.</p>
  <h2>Umsetzung</h2>
  <p>Im Plan geblieben: ${pl.length?`${py} Tage voll, ${pt} teilweise, ${pl.length-py-pt} nicht (von ${pl.length} Tagen mit Angabe)`:'keine Angaben'}.</p>
  <p>Ketonmessungen: ${kd.length?`${kin} von ${kd.length} bei 0,5 mmol/l oder höher, Mittelwert ${fmt(kd.reduce((s,d)=>s+d.k,0)/kd.length,2)} mmol/l`:'keine'}.</p>
