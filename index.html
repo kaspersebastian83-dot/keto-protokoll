@@ -215,7 +215,7 @@ td.num,th.num{text-align:right}
 
 <script>
 const KEY='ketoProtokoll_v1';
-const VERSION='1.5.1'; // keep in sync with package.json, package-lock.json, and sw.js
+const VERSION='1.5.2'; // keep in sync with package.json, package-lock.json, and sw.js
 const SYMS=['Kopfschmerz','Müdigkeit','Muskelkrämpfe','Verdauung','Schwindel','Schlecht geschlafen','Heißhunger','Herzklopfen','Gereizt'];
 const DEFAULT_LABS=[['HbA1c','%'],['Glukose nüchtern','mg/dl'],['Gesamtcholesterin','mg/dl'],['LDL-Cholesterin','mg/dl'],['HDL-Cholesterin','mg/dl'],['Triglyzeride','mg/dl'],['Harnsäure','mg/dl'],['Kreatinin','mg/dl'],['eGFR','ml/min'],['GPT (ALT)','U/l'],['GOT (AST)','U/l'],['Gamma-GT','U/l'],['Natrium','mmol/l'],['Kalium','mmol/l'],['Magnesium','mmol/l'],['TSH','mU/l'],['CRP','mg/l']];
 const REFERENCES=[
@@ -314,10 +314,9 @@ const uid=()=>'m'+Date.now().toString(36)+Math.random().toString(36).slice(2,7);
 
 let S;
 const DATA_VERSION=3;
-// Upgrades any older saved shape to the current one, step by step, and stamps
-// the result with DATA_VERSION. The single source of defaulting logic for
-// both load() and backup import — no other code should patch missing fields.
-function migrate(data){
+// Upgrades one saved state to the current shape without traversing its archive.
+// Shared by live data, backup import, and archived snapshots.
+function migrateState(data){
  let d=(data&&typeof data==='object')?data:{};
  let v=d.dataVersion||0;
  if(v<1){
@@ -356,6 +355,23 @@ function migrate(data){
  // a settings object missing it for any reason never crashes rendering.
  if(!d.settings.alerts||typeof d.settings.alerts!=='object')d.settings.alerts={sysMin:null,sysMax:null,diaMin:null,diaMax:null,gMin:null,gMax:null,pMin:null,pMax:null,action:''};
  d.dataVersion=v;
+ return d;
+}
+function migrate(data){
+ const d=migrateState(data);
+ if(Array.isArray(d.archive))d.archive.forEach(entry=>{
+  const snapshot=entry&&entry.data;
+  if(!snapshot||typeof snapshot!=='object'||Array.isArray(snapshot)||
+     !snapshot.settings||typeof snapshot.settings!=='object'||Array.isArray(snapshot.settings)||
+     !snapshot.days||typeof snapshot.days!=='object'||Array.isArray(snapshot.days)||
+     (snapshot.dataVersion||0)>DATA_VERSION)return;
+  try{
+   const migrated=migrateState(JSON.parse(JSON.stringify(snapshot)));
+   entry.data=migrated;
+  }catch(e){
+   // Keep an unreadable snapshot unchanged and continue with later entries.
+  }
+ });
  return d;
 }
 function load(){
@@ -1054,9 +1070,11 @@ function startNewRound(){
 function viewArchivedReport(idx){
  const entry=S.archive[idx];if(!entry)return;
  const live=S;
- S=entry.data;
- const html=reportHTML();
- S=live;
+ let html;
+ try{
+  S=entry.data;
+  html=reportHTML();
+ }finally{S=live}
  doPrint(html,false);
 }
 $('#importFile').addEventListener('change',e=>{
