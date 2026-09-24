@@ -55,6 +55,12 @@ textarea{min-height:64px;resize:vertical}
 .chips{display:flex;flex-wrap:wrap;gap:6px;margin-top:6px}
 .chips button{border-radius:999px;padding:5px 12px;font-size:.9rem}
 .chips button.on{background:var(--s2);border-color:var(--s2);color:#fff}
+.badge{display:inline-block;font-size:.78rem;color:var(--keto);background:var(--ketoBand);padding:2px 9px;border-radius:999px;margin:5px 0}
+.lit-item{padding:12px 0}
+.lit-item label{display:flex;align-items:flex-start;gap:8px;cursor:pointer}
+.lit-item input[type="checkbox"]{width:18px;height:18px;flex:none;margin-top:2px}
+.lit-note{font-style:italic;color:var(--muted);font-size:.85rem;margin:5px 0 0}
+.lit-item a{display:inline-block;margin-top:6px;font-size:.9rem}
 .btn.primary{background:var(--ink);color:var(--paper);border-color:var(--ink);font-weight:500}
 .btn.danger{color:var(--warn);border-color:var(--warn)}
 .btns{display:flex;flex-wrap:wrap;gap:8px;margin-top:10px}
@@ -160,6 +166,8 @@ td.num,th.num{text-align:right}
 .report .callout ul{padding-left:4mm;margin-top:0}
 .report .callout li{margin:1.6mm 0}
 .report .qs{white-space:pre-wrap;border:.6pt solid #999;padding:2mm 3mm;min-height:30mm}
+.report .refs{font-family:"IBM Plex Sans",system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;font-size:8.3pt;color:#333;margin:0;padding:0;list-style:none}
+.report .refs li{padding-left:5mm;text-indent:-5mm;margin:1.6mm 0}
 </style>
 </head>
 <body>
@@ -178,6 +186,7 @@ td.num,th.num{text-align:right}
   <button role="tab" data-tab="trend" aria-selected="false">Verlauf</button>
   <button role="tab" data-tab="print" aria-selected="false">Drucken</button>
   <button role="tab" data-tab="set" aria-selected="false">Einstellungen</button>
+  <button role="tab" data-tab="lit" aria-selected="false">Literatur</button>
  </nav>
  <main>
   <section id="v-day"></section>
@@ -186,6 +195,7 @@ td.num,th.num{text-align:right}
   <section id="v-trend" hidden></section>
   <section id="v-print" hidden></section>
   <section id="v-set" hidden></section>
+  <section id="v-lit" hidden></section>
  </main>
 </div>
 <div id="status" role="status" aria-live="polite"></div>
@@ -197,6 +207,85 @@ const KEY='ketoProtokoll_v1';
 const VERSION='1.2.0'; // keep sw.js's CACHE_NAME suffix in sync with this by hand
 const SYMS=['Kopfschmerz','Müdigkeit','Muskelkrämpfe','Verdauung','Schwindel','Schlecht geschlafen','Heißhunger','Herzklopfen','Gereizt'];
 const DEFAULT_LABS=[['HbA1c','%'],['Glukose nüchtern','mg/dl'],['Gesamtcholesterin','mg/dl'],['LDL-Cholesterin','mg/dl'],['HDL-Cholesterin','mg/dl'],['Triglyzeride','mg/dl'],['Harnsäure','mg/dl'],['Kreatinin','mg/dl'],['eGFR','ml/min'],['GPT (ALT)','U/l'],['GOT (AST)','U/l'],['Gamma-GT','U/l'],['Natrium','mmol/l'],['Kalium','mmol/l'],['Magnesium','mmol/l'],['TSH','mU/l'],['CRP','mg/l']];
+const REFERENCES=[
+ {id:'zurawski2026', num:1, category:'Wirksamkeit der ketogenen Ernährung',
+  title:'Do Ketogenic Diets Produce Greater Weight Loss than Higher-Carbohydrate Diets Under Comparable Prescribed Energy Conditions? A Systematic Review and Meta-Analysis of RCTs',
+  citation:'Żurawski T, Bartosiewicz A. Do Ketogenic Diets Produce Greater Weight Loss than Higher-Carbohydrate Diets Under Comparable Prescribed Energy Conditions? A Systematic Review and Meta-Analysis of Randomized Controlled Trials. Nutrients. 2026;18(15):2525.',
+  doi:'10.3390/nu18152525', access:'Open Access',
+  note:'Metaanalyse zur Gewichtsverlust-Wirksamkeit ggü. kohlenhydratreicheren Diäten.'},
+
+ {id:'ghasemi2024', num:2, category:'Blutdruck',
+  title:'Impact of very low carbohydrate ketogenic diets on cardiovascular risk factors among patients with type 2 diabetes',
+  citation:'Ghasemi P, Jafari M, Maskouni SJ, Hosseini SA, Amiri R, Hejazi J, Chambari M, Tavasolian R, Rahimlou M. Impact of very low carbohydrate ketogenic diets on cardiovascular risk factors among patients with type 2 diabetes; GRADE-assessed systematic review and meta-analysis of clinical trials. Nutr Metab (Lond). 2024;21:50.',
+  doi:'10.1186/s12986-024-00824-w', access:'Open Access',
+  note:'GRADE-bewertete Metaanalyse zu Blutdruck, Blutzucker und Lipiden unter VLCKD.'},
+
+ {id:'budoff2024', num:3, category:'Cholesterin / Lipidprofil',
+  title:'Carbohydrate Restriction-Induced Elevations in LDL-Cholesterol and Atherosclerosis: The KETO Trial',
+  citation:'Budoff M, Manubolu VS, Kinninger A, Norwitz NG, Feldman D, Wood TR, Fialkow J, Cury R, Feldman T, Nasir K. Carbohydrate Restriction-Induced Elevations in LDL-Cholesterol and Atherosclerosis: The KETO Trial. JACC Adv. 2024;3(8):101109.',
+  doi:'10.1016/j.jacadv.2024.101109', access:'Open Access',
+  note:'Direkt relevant für die LDL-Normbereich-Kennzeichnung im Laborwerte-Tab.'},
+
+ {id:'ada2025', num:4, category:'Blutzucker & HbA1c',
+  title:'Diagnosis and Classification of Diabetes: Standards of Care in Diabetes—2025',
+  citation:'American Diabetes Association Professional Practice Committee. 2. Diagnosis and Classification of Diabetes: Standards of Care in Diabetes—2025. Diabetes Care. 2025;48(Suppl 1):S27–S49.',
+  doi:'10.2337/dc25-S002', access:'Meist frei zugänglich',
+  note:'Referenz für HbA1c- und Blutzucker-Zielwerte.'},
+
+ {id:'fante2025', num:5, category:'Ketonkörper – Zielbereich',
+  title:'The role of β-hydroxybutyrate testing in ketogenic metabolic therapies',
+  citation:'Fante C, Spritzler F, Calabrese L, Laurent N, Roberts C, Deloudi S. The role of β-hydroxybutyrate testing in ketogenic metabolic therapies. Front Nutr. 2025;12:1629921.',
+  doi:'10.3389/fnut.2025.1629921', access:'Open Access',
+  note:'Quelle für den Ketose-Zielbereich im Verlauf-Chart. Hinweis: zwei der sechs Autor:innen sind bei Keto-Industrieunternehmen angestellt (im Paper offengelegt).'},
+
+ {id:'skartun2025', num:6, category:'Nebenwirkungen der Umstellung ("Keto-Flu")',
+  title:'Symptoms during initiation of a ketogenic diet: a scoping review',
+  citation:'Skartun O, Smith CR, Laupsa-Borge J, Dankel SN. Symptoms during initiation of a ketogenic diet: a scoping review of occurrence rates, mechanisms and relief strategies. Front Nutr. 2025;12:1538266.',
+  doi:'10.3389/fnut.2025.1538266', access:'Open Access',
+  note:'Hintergrund zu den Beschwerden-Chips im Tagesprotokoll.'},
+
+ {id:'gohari2023', num:7, category:'Harnsäure & Nierensteine',
+  title:'Effect of DASH and ketogenic diets on serum uric acid concentration',
+  citation:'Gohari S, Ghobadi S, Jafari A, Ahangar H, Gohari S, Mahjani M. The effect of dietary approaches to stop hypertension and ketogenic diets intervention on serum uric acid concentration: a systematic review and meta-analysis of RCTs. Sci Rep. 2023;13:10492.',
+  doi:'10.1038/s41598-023-37672-2', access:'Open Access',
+  note:'Relevant für die Harnsäure-Zeile im Laborwerte-Tab.'},
+
+ {id:'acharya2021', num:8, category:'Harnsäure & Nierensteine',
+  title:'Incidence and Characteristics of Kidney Stones in Patients on Ketogenic Diet',
+  citation:'Acharya P, Acharya C, Thongprayoon C, Hansrivijit P, Kanduri SR, Kovvuru K, Medaura J, Vaitla P, Garcia Anton DF, Mekraksakit P, Pattharanitima P, Bathini T, Cheungpasitporn W. Incidence and Characteristics of Kidney Stones in Patients on Ketogenic Diet: A Systematic Review and Meta-Analysis. Diseases. 2021;9(2):39.',
+  doi:'10.3390/diseases9020039', access:'Open Access',
+  note:'Relevant für Kreatinin/eGFR im Laborwerte-Tab.'},
+
+ {id:'dunbarjacob2025', num:9, category:'Medikamenten-Adhärenz',
+  title:'Medication Adherence Measurement in Chronic Diseases: A State-of-the-Art Review',
+  citation:'Dunbar-Jacob J, Zhao J. Medication Adherence Measurement in Chronic Diseases: A State-of-the-Art Review of the Literature. Nurs Rep. 2025;15(10):370.',
+  doi:'10.3390/nursrep15100370', access:'Open Access',
+  note:'Hintergrund für das Medikamenten-Log und die Adhärenz-Anzeige.'},
+
+ {id:'burke2011', num:10, category:'Selbstmonitoring als Erfolgsfaktor',
+  title:'Self-monitoring in weight loss: a systematic review of the literature',
+  citation:'Burke LE, Wang J, Sevick MA. Self-monitoring in weight loss: a systematic review of the literature. J Am Diet Assoc. 2011;111(1):92-102.',
+  doi:'10.1016/j.jada.2010.10.008', access:'Frei via PMC (PMC3268700)',
+  note:'Klassische Arbeit zum Zusammenhang zwischen Protokollführung und Erfolg.'},
+
+ {id:'shimbo2020', num:11, category:'Blutdruck-Selbstmessung zuhause',
+  title:'Self-Measured Blood Pressure Monitoring at Home',
+  citation:'Shimbo D, Artinian NT, Basile JN, et al. Self-Measured Blood Pressure Monitoring at Home: A Joint Policy Statement From the American Heart Association and American Medical Association. Circulation. 2020;142(4):e42-e63.',
+  doi:'10.1161/CIR.0000000000000803', access:'Zugang variiert',
+  note:'Grundlage für die tägliche Blutdruck-Erfassung morgens im Sitzen.'},
+
+ {id:'islr2021', num:12, category:'Statistik-Methodik',
+  title:'An Introduction to Statistical Learning: with Applications in R',
+  citation:'James G, Witten D, Hastie T, Tibshirani R. An Introduction to Statistical Learning: with Applications in R. 2nd ed. Springer; 2021.',
+  url:'https://www.statlearning.com', access:'Kostenlos als PDF',
+  note:'Kapitel 3 (lineare Regression) entspricht der im Bericht verwendeten Trendberechnung.'},
+
+ {id:'phinney2011', num:13, category:'Grundlagenliteratur',
+  title:'The Art and Science of Low Carbohydrate Living',
+  citation:'Phinney SD, Volek JS. The Art and Science of Low Carbohydrate Living. Beyond Obesity LLC; 2011. ISBN 9780983490708.',
+  access:'Kostenpflichtig (Buch)',
+  note:'Grundlagenwerk zur praktischen Umsetzung einer kohlenhydratreduzierten Ernährung.'}
+];
 const $=s=>document.querySelector(s);
 
 /* ---------- helpers ---------- */
@@ -215,12 +304,13 @@ const uid=()=>'m'+Date.now().toString(36)+Math.random().toString(36).slice(2,7);
 let S;
 function load(){
  try{S=JSON.parse(localStorage.getItem(KEY))}catch(e){S=null}
- if(!S||!S.settings){S={settings:{name:'',start:today(),days:90,carbGoal:50,questions:'',lastBackup:null,meds:[]},days:{},weeks:{},labs:DEFAULT_LABS.map(([n,u])=>({name:n,unit:u,range:'',base:'',end:''})),labDates:{base:today(),end:''},doseChanges:[],archive:[]}}
+ if(!S||!S.settings){S={settings:{name:'',start:today(),days:90,carbGoal:50,questions:'',lastBackup:null,meds:[]},days:{},weeks:{},labs:DEFAULT_LABS.map(([n,u])=>({name:n,unit:u,range:'',base:'',end:''})),labDates:{base:today(),end:''},doseChanges:[],archive:[],refRead:{}}}
  if(!S.settings.meds)S.settings.meds=[];
  if(!S.doseChanges)S.doseChanges=[];
  if(!S.labs)S.labs=[];
  S.labs.forEach(r=>{if(r.range==null)r.range=''});
  if(!S.archive)S.archive=[];
+ if(!S.refRead)S.refRead={};
 }
 let stT;
 function save(msg){
@@ -669,6 +759,8 @@ function reportHTML(){
  ${talkingPoints.length?`<ul>${talkingPoints.map(p=>`<li>${p}</li>`).join('')}</ul>`:'<p>Keine auffälligen Muster in diesem Zeitraum.</p>'}
  </div>
  <h2>Fragen für die Besprechung</h2><div class="qs">${esc(st.questions)}</div>
+ <h2>Quellen</h2>
+ <ul class="refs">${[...REFERENCES].sort((a,b)=>a.num-b.num).map(r=>`<li>${r.num}. ${esc(r.citation)}</li>`).join('')}</ul>
  <p class="small" style="margin-top:4mm">Keto-Protokoll v${VERSION}</p>
  </div>`;
 }
@@ -769,12 +861,37 @@ function viewArchivedReport(idx){
 }
 $('#importFile').addEventListener('change',e=>{
  const file=e.target.files[0];if(!file)return;const r=new FileReader();
- r.onload=()=>{try{const d=JSON.parse(r.result);if(!d.settings||!d.days)throw 0;if(!confirm('Backup laden? Die aktuellen Daten in diesem Browser werden ersetzt.'))return;S=d;S.weeks=S.weeks||{};S.labs=S.labs||[];S.labs.forEach(r=>{if(r.range==null)r.range=''});S.labDates=S.labDates||{};S.settings.meds=S.settings.meds||[];S.doseChanges=S.doseChanges||[];S.archive=S.archive||[];save('Backup geladen');renderAll()}catch(err){status('Datei ist kein gültiges Backup')}e.target.value=''};
+ r.onload=()=>{try{const d=JSON.parse(r.result);if(!d.settings||!d.days)throw 0;if(!confirm('Backup laden? Die aktuellen Daten in diesem Browser werden ersetzt.'))return;S=d;S.weeks=S.weeks||{};S.labs=S.labs||[];S.labs.forEach(r=>{if(r.range==null)r.range=''});S.labDates=S.labDates||{};S.settings.meds=S.settings.meds||[];S.doseChanges=S.doseChanges||[];S.archive=S.archive||[];S.refRead=S.refRead||{};save('Backup geladen');renderAll()}catch(err){status('Datei ist kein gültiges Backup')}e.target.value=''};
  r.readAsText(file);
 });
 
+/* ---------- literature ---------- */
+function renderLit(){
+ const read=REFERENCES.filter(r=>S.refRead[r.id]).length;
+ const groups=[];
+ REFERENCES.forEach(r=>{
+  let g=groups.find(x=>x.category===r.category);
+  if(!g){g={category:r.category,items:[]};groups.push(g)}
+  g.items.push(r);
+ });
+ const item=r=>{
+  const checked=!!S.refRead[r.id];
+  const link=r.doi?`https://doi.org/${r.doi}`:(r.url||null);
+  return `<div class="row wide lit-item"><label><input type="checkbox" data-ref="${r.id}" ${checked?'checked':''}><b>${esc(r.title)}</b></label><p class="small">${esc(r.citation)}</p><span class="badge">${esc(r.access)}</span><p class="lit-note">${esc(r.note)}</p>${link?`<a href="${esc(link)}" target="_blank" rel="noopener">Quelle öffnen</a>`:''}</div>`;
+ };
+ $('#v-lit').innerHTML=`<div class="panel"><h2>Literatur</h2><p class="sub">${read} von ${REFERENCES.length} gelesen</p></div>
+ ${groups.map(g=>`<div class="panel"><h2>${esc(g.category)}</h2>${g.items.map(item).join('')}</div>`).join('')}`;
+}
+$('#v-lit').addEventListener('change',e=>{
+ if(e.target.dataset.ref==null)return;
+ const id=e.target.dataset.ref;
+ if(e.target.checked)S.refRead[id]=true;else delete S.refRead[id];
+ save();
+ const y=window.scrollY;renderLit();window.scrollTo(0,y);
+});
+
 /* ---------- tabs ---------- */
-const R={day:renderDay,week:renderWeek,lab:renderLab,trend:renderTrend,print:renderPrint,set:renderSet};
+const R={day:renderDay,week:renderWeek,lab:renderLab,trend:renderTrend,print:renderPrint,set:renderSet,lit:renderLit};
 function show(tab){curTab=tab;document.querySelectorAll('nav button').forEach(b=>b.setAttribute('aria-selected',b.dataset.tab===tab));Object.keys(R).forEach(k=>$('#v-'+k).hidden=k!==tab);R[tab]();renderHead()}
 document.querySelector('nav').addEventListener('click',e=>{const b=e.target.closest('[data-tab]');if(b)show(b.dataset.tab)});
 $('#strip').addEventListener('click',e=>{const b=e.target.closest('[data-date]');if(!b)return;curDate=b.dataset.date;show('day')});
