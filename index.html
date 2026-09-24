@@ -32,7 +32,8 @@ header h1{font-weight:600;font-size:1.7rem;line-height:1.2;color:var(--ink);marg
 .strip .today{outline:2px solid var(--ink);outline-offset:1px}
 .strip .cur{border:2px solid var(--s2)}
 .strip .alert-dot{position:absolute;top:-2px;right:-2px;width:6px;height:6px;border-radius:50%;background:var(--warn)}
-nav{display:flex;gap:2px;overflow-x:auto;border-bottom:2px solid var(--ink);margin-bottom:16px;position:sticky;top:env(safe-area-inset-top,0px);background:var(--paper);z-index:5}
+nav{display:flex;gap:2px;overflow-x:auto;border-bottom:2px solid var(--ink);margin-bottom:16px;position:sticky;top:env(safe-area-inset-top,0px);background:var(--paper);z-index:5;scrollbar-width:none;-ms-overflow-style:none}
+nav::-webkit-scrollbar{display:none}
 nav button{border:0;background:none;padding:10px 12px;font:inherit;color:var(--muted);cursor:pointer;border-bottom:3px solid transparent;margin-bottom:-2px;white-space:nowrap}
 nav button[aria-selected="true"]{color:var(--ink);border-bottom-color:var(--ink);font-weight:600}
 .panel{background:var(--field);border:1px solid var(--line);border-radius:6px;padding:14px 16px;margin-bottom:16px}
@@ -945,9 +946,13 @@ function reportHTML(){
  </div>`;
 }
 
+// iOS standalone/home-screen mode has a known, long-standing WebKit
+// limitation where window.print() is unreliable — not fixable in-app, so
+// this is advisory only and never disables the print buttons themselves.
+const isStandalone=()=>(window.matchMedia&&window.matchMedia('(display-mode: standalone)').matches)||window.navigator.standalone===true;
 function renderPrint(){
  const def=Math.min(nWeeks(),Math.max(1,weekOf(today())));
- $('#v-print').innerHTML=`<div class="panel"><h2>Kühlschrank-Blatt</h2><p class="sub">Eine Woche auf A4 quer. Leer drucken zum Ausfüllen, oder mit den schon erfassten Werten.</p>
+ $('#v-print').innerHTML=`${isStandalone()?'<p class="nudge" id="standaloneNote">Drucken funktioniert im installierten Modus auf dem iPhone oft nicht zuverlässig — bitte diese Seite stattdessen in Safari öffnen (nicht über das App-Symbol).</p>':''}<div class="panel"><h2>Kühlschrank-Blatt</h2><p class="sub">Eine Woche auf A4 quer. Leer drucken zum Ausfüllen, oder mit den schon erfassten Werten.</p>
  <div class="row"><label for="pw"><b>Woche</b></label><select id="pw">${Array.from({length:nWeeks()},(_,i)=>{const [a]=weekRange(i+1);return `<option value="${i+1}" ${i+1===def?'selected':''}>Woche ${i+1} (ab ${fd(a)})</option>`}).join('')}</select></div>
  <div class="row"><label for="pfill"><b>Erfasste Werte eintragen</b><small>aus: leeres Blatt</small></label><input id="pfill" type="checkbox" style="width:22px;height:22px;justify-self:end"></div>
  <div class="btns"><button type="button" class="btn primary" id="doSheet">Blatt drucken</button></div></div>
