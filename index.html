@@ -49,6 +49,10 @@ input,textarea,select{font:inherit;color:var(--text);background:var(--paper);bor
 textarea{min-height:64px;resize:vertical}
 .unit{color:var(--muted);font-size:.82rem;min-width:3.6em}
 .hint{grid-column:1/-1;color:var(--s2);font-size:.78rem;margin-top:2px}
+.bp-line{display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin-top:6px}
+.bp-line b{flex:0 0 auto;min-width:150px;font-weight:500;font-size:.92rem}
+.bp-line .inp{flex:1 1 170px}
+.bp-avg{display:block;color:var(--muted);font-size:.85rem;margin-top:4px}
 :focus-visible{outline:2px solid var(--ink);outline-offset:2px}
 .scale,.seg{display:flex;gap:4px}
 .scale button,.seg button,.chips button,.btn{border:1px solid var(--line);background:var(--paper);border-radius:4px;font:inherit;color:var(--text);cursor:pointer;padding:8px 10px}
@@ -124,6 +128,7 @@ td.num,th.num{text-align:right}
 .sheet tbody.zone-lifestyle td.cell{height:8mm;font-size:10.3pt}
 .sheet .ok{color:var(--keto);font-weight:600}
 .sheet .empty{color:var(--line)}
+.sheet .bp2{display:block;font-size:8.6pt;line-height:1.2}
 .sheet .ruled{background-image:repeating-linear-gradient(#fff 0 7.4mm,var(--hair) 7.4mm 7.6mm);background-position:0 4mm}
 .sheet tr.tall td.cell{height:15mm}
 .sheet .wk-wrap{border-top:.8pt solid var(--ink);margin-top:2.5mm;padding-top:1.2mm}
@@ -206,7 +211,7 @@ td.num,th.num{text-align:right}
 
 <script>
 const KEY='ketoProtokoll_v1';
-const VERSION='1.3.0'; // keep sw.js's CACHE_NAME suffix in sync with this by hand
+const VERSION='1.4.0'; // keep sw.js's CACHE_NAME suffix in sync with this by hand
 const SYMS=['Kopfschmerz','Müdigkeit','Muskelkrämpfe','Verdauung','Schwindel','Schlecht geschlafen','Heißhunger','Herzklopfen','Gereizt'];
 const DEFAULT_LABS=[['HbA1c','%'],['Glukose nüchtern','mg/dl'],['Gesamtcholesterin','mg/dl'],['LDL-Cholesterin','mg/dl'],['HDL-Cholesterin','mg/dl'],['Triglyzeride','mg/dl'],['Harnsäure','mg/dl'],['Kreatinin','mg/dl'],['eGFR','ml/min'],['GPT (ALT)','U/l'],['GOT (AST)','U/l'],['Gamma-GT','U/l'],['Natrium','mmol/l'],['Kalium','mmol/l'],['Magnesium','mmol/l'],['TSH','mU/l'],['CRP','mg/l']];
 const REFERENCES=[
@@ -304,7 +309,7 @@ const vv=x=>x==null?'':String(x).replace('.',',');
 const uid=()=>'m'+Date.now().toString(36)+Math.random().toString(36).slice(2,7);
 
 let S;
-const DATA_VERSION=1;
+const DATA_VERSION=2;
 // Upgrades any older saved shape to the current one, step by step, and stamps
 // the result with DATA_VERSION. The single source of defaulting logic for
 // both load() and backup import — no other code should patch missing fields.
@@ -331,6 +336,16 @@ function migrate(data){
   if(!d.refRead)d.refRead={};
   v=1;
  }
+ if(v<2)v=2;
+ // Two-reading blood pressure: any lingering single sys/dia with no sys1 yet
+ // becomes reading 1, then sys/dia are (re)computed from sys1/sys2. This runs
+ // every load, not just while v<2, so it stays correct even for a day object
+ // that never went through the day-entry UI's own change handler.
+ Object.values(d.days).forEach(day=>{
+  if(day.sys!=null&&day.sys1==null)day.sys1=day.sys;
+  if(day.dia!=null&&day.dia1==null)day.dia1=day.dia;
+  recomputeBP(day);
+ });
  d.dataVersion=v;
  return d;
 }
@@ -371,10 +386,21 @@ function checkPlausibility(field,value,ref){
  return null;
 }
 function plausMsg(field,d){
- if(field==='sys'||field==='dia')return checkPlausibility('sys',d.sys,d.dia)||checkPlausibility('dia',d.dia,null)||'';
  const ref=field==='w'?prevLoggedValue('w',curDate):null;
  return checkPlausibility(field,d[field],ref)||'';
 }
+// sys/dia stay the derived daily value: the average of both readings if both
+// exist, otherwise whichever single reading exists. Every existing consumer
+// (charts, trend fit, talking points, report tables, thresholds) keeps
+// reading sys/dia unchanged and is never touched by the two-reading UI.
+function deriveOne(a,b){if(a!=null&&b!=null)return Math.round((a+b)/2);if(a!=null)return a;if(b!=null)return b;return null}
+function recomputeBP(d){
+ const sys=deriveOne(d.sys1,d.sys2),dia=deriveOne(d.dia1,d.dia2);
+ if(sys==null)delete d.sys;else d.sys=sys;
+ if(dia==null)delete d.dia;else d.dia=dia;
+}
+function bpReadingMsg(sys,dia){return checkPlausibility('sys',sys,dia)||checkPlausibility('dia',dia,null)||''}
+function bpDiffMsg(d){return (d.sys1!=null&&d.sys2!=null&&Math.abs(d.sys1-d.sys2)>15)?'Messungen weichen stark ab — evtl. eine dritte Messung':''}
 function medAdherence(from,to,medId){let taken=0,logged=0;for(let i=0;i<=diffDays(from,to);i++){const d=S.days[addDays(from,i)];if(d&&d.meds&&d.meds[medId]!==undefined){logged++;if(d.meds[medId])taken++}}return {taken,logged}}
 // null: never backed up. Otherwise days since the last export.
 function daysSinceBackup(){return S.settings.lastBackup?diffDays(S.settings.lastBackup,today()):null}
@@ -425,13 +451,34 @@ function renderHead(){
 function numRow(f,label,hint,unit,d,mode='decimal',warn){
  return `<div class="row"><label for="f_${f}"><b>${label}</b><small>${hint}</small></label><div class="inp"><input id="f_${f}" data-f="${f}" type="text" inputmode="${mode}" autocomplete="off" value="${vv(d[f])}"><span class="unit">${unit}</span></div><small class="hint" id="hint_${f}"${warn?'':' hidden'}>${warn||''}</small></div>`}
 function updateHint(field,d){
- const key=(field==='sys'||field==='dia')?'bp':field;
- const el=$('#hint_'+key);if(!el)return;
+ const el=$('#hint_'+field);if(!el)return;
  const msg=plausMsg(field,d);
  el.textContent=msg;el.hidden=!msg;
 }
+function setHint(id,msg){const el=$('#'+id);if(!el)return;el.textContent=msg;el.hidden=!msg}
+function updateBPUI(d){
+ setHint('hint_bp1',bpReadingMsg(d.sys1,d.dia1));
+ setHint('hint_bp2',bpReadingMsg(d.sys2,d.dia2));
+ setHint('hint_bpdiff',bpDiffMsg(d));
+ const avgEl=$('#bpAvg');if(!avgEl)return;
+ const show=d.sys1!=null&&d.dia1!=null&&d.sys2!=null&&d.dia2!=null;
+ avgEl.hidden=!show;
+ if(show)avgEl.textContent=`Ø ${d.sys}/${d.dia}`;
+}
 function scaleRow(f,label,hint,d){
  return `<div class="row"><div class="lbl"><b>${label}</b><small>${hint}</small></div><div class="scale" role="group" aria-label="${label}">${[1,2,3,4,5].map(n=>`<button type="button" data-scale="${f}" data-v="${n}" class="${d[f]===n?'on':''}" aria-pressed="${d[f]===n}">${n}</button>`).join('')}</div></div>`}
+function bpRowHTML(d){
+ const msg1=bpReadingMsg(d.sys1,d.dia1),msg2=bpReadingMsg(d.sys2,d.dia2),diff=bpDiffMsg(d);
+ const showAvg=d.sys1!=null&&d.dia1!=null&&d.sys2!=null&&d.dia2!=null;
+ return `<div class="row wide"><div class="lbl"><b>Blutdruck</b><small>sitzend, nach 5 min Ruhe, 2× im Abstand von 1 Minute</small></div>
+ <div class="bp-line"><b>1. Messung</b><div class="inp"><input id="f_sys1" data-f="sys1" type="text" inputmode="numeric" placeholder="sys" value="${vv(d.sys1)}" aria-label="1. Messung systolisch"><span>/</span><input data-f="dia1" type="text" inputmode="numeric" placeholder="dia" value="${vv(d.dia1)}" aria-label="1. Messung diastolisch"></div></div>
+ <small class="hint" id="hint_bp1"${msg1?'':' hidden'}>${msg1}</small>
+ <div class="bp-line"><b>2. Messung (nach 1 Min.)</b><div class="inp"><input id="f_sys2" data-f="sys2" type="text" inputmode="numeric" placeholder="sys" value="${vv(d.sys2)}" aria-label="2. Messung systolisch"><span>/</span><input data-f="dia2" type="text" inputmode="numeric" placeholder="dia" value="${vv(d.dia2)}" aria-label="2. Messung diastolisch"></div></div>
+ <small class="hint" id="hint_bp2"${msg2?'':' hidden'}>${msg2}</small>
+ <small class="hint" id="hint_bpdiff"${diff?'':' hidden'}>${diff}</small>
+ <small class="bp-avg" id="bpAvg"${showAvg?'':' hidden'}>Ø ${d.sys}/${d.dia}</small>
+ </div>`;
+}
 function backupWarnHTML(){
  const lb=daysSinceBackup();
  return `<div class="panel warnpanel" id="backupWarn"><p>${lb===null?'Noch kein Backup gemacht':`Letztes Backup vor ${lb} Tagen`} — die Daten liegen nur in diesem Browser.</p><div class="btns"><button type="button" class="btn primary" id="backupWarnExp">Jetzt sichern</button><button type="button" class="btn" id="backupWarnDismiss">Für heute ausblenden</button></div></div>`;
@@ -445,7 +492,7 @@ function renderDay(){
  ${numRow('w','Gewicht','nach dem Aufstehen','kg',d,'decimal',plausMsg('w',d))}
  ${numRow('g','Blutzucker','vor Frühstück und Kaffee','mg/dl',d,'numeric',plausMsg('g',d))}
  ${numRow('k','Ketone','Blutmessung','mmol/l',d,'decimal',plausMsg('k',d))}
- <div class="row"><label for="f_sys"><b>Blutdruck</b><small>sitzend, nach 5 min Ruhe</small></label><div class="inp"><input id="f_sys" data-f="sys" type="text" inputmode="numeric" placeholder="sys" value="${vv(d.sys)}" aria-label="systolisch"><span>/</span><input data-f="dia" type="text" inputmode="numeric" placeholder="dia" value="${vv(d.dia)}" aria-label="diastolisch"></div><small class="hint" id="hint_bp"${plausMsg('sys',d)?'':' hidden'}>${plausMsg('sys',d)}</small></div>
+ ${bpRowHTML(d)}
  ${numRow('p','Puls','optional, vom Blutdruckgerät','/min',d,'numeric',plausMsg('p',d))}
  </div>
  <div class="panel"><h2>Über den Tag</h2>
@@ -459,14 +506,22 @@ function renderDay(){
  ${S.settings.meds.length?`<div class="panel"><h2>Medikamente</h2>${S.settings.meds.map(m=>{const v=(d.meds||{})[m.id];return `<div class="row"><div class="lbl"><b>${esc(m.name)}</b><small>${esc(m.dose)}${m.category?' · '+esc(m.category):''}</small></div><div class="seg" role="group" aria-label="${esc(m.name)}">${[['1','Genommen'],['0','Nicht genommen']].map(([k,l])=>{const on=(k==='1'&&v===true)||(k==='0'&&v===false);return `<button type="button" data-med="${m.id}" data-mv="${k}" class="${on?'on':''}" aria-pressed="${on}">${l}</button>`}).join('')}</div></div>`}).join('')}</div>`:''}`;
  $('#v-day').innerHTML=h;
 }
+const BP_READING_FIELDS=['sys1','dia1','sys2','dia2'];
 $('#v-day').addEventListener('change',e=>{
  const t=e.target;
  if(t.id==='dpick'){if(t.value){curDate=t.value;renderDay();renderHead()}return}
  const d=getDay(curDate);
- if(t.dataset.f){const n=num(t.value);if(t.value.trim()!==''&&n===null){status('Bitte eine Zahl eingeben');return}if(n===null)delete d[t.dataset.f];else d[t.dataset.f]=n}
+ if(t.dataset.f){
+  const n=num(t.value);if(t.value.trim()!==''&&n===null){status('Bitte eine Zahl eingeben');return}
+  if(n===null)delete d[t.dataset.f];else d[t.dataset.f]=n;
+  if(BP_READING_FIELDS.includes(t.dataset.f))recomputeBP(d);
+ }
  else if(t.dataset.t){const v=t.value.trim();if(v)d[t.dataset.t]=v;else delete d[t.dataset.t]}
  save();renderHead();
- if(t.dataset.f)updateHint(t.dataset.f,d);
+ if(t.dataset.f){
+  if(BP_READING_FIELDS.includes(t.dataset.f))updateBPUI(d);
+  else updateHint(t.dataset.f,d);
+ }
 });
 $('#v-day').addEventListener('click',e=>{
  const b=e.target.closest('button');if(!b)return;
@@ -656,7 +711,7 @@ function sheetHTML(wn,fill){
   ['Gewicht','kg, morgens',ds=>cell(ds,'w')],
   ['Blutzucker','mg/dl, nüchtern',ds=>cell(ds,'g')],
   ['Ketone','mmol/l, nüchtern',ds=>cell(ds,'k')],
-  ['Blutdruck','sys / dia',ds=>{const d=D(ds);return d.sys!=null?`${d.sys}/${d.dia??''}`:'<span class="empty">/</span>'}],
+  ['Blutdruck','2× sys/dia, 1 Min. Abstand',ds=>{const d=D(ds);const slot=(s,di)=>s!=null?`${s}/${di??''}`:'<span class="empty">__/__</span>';return `<span class="bp2">${slot(d.sys1,d.dia1)}</span><span class="bp2">${slot(d.sys2,d.dia2)}</span>`}],
   ...S.settings.meds.map(m=>[esc(m.name),esc(m.dose),ds=>{const v=(D(ds).meds||{})[m.id];return v===true?'<b class="ok">✓</b>':v===false?'<b>✗</b>':'<span class="empty">□</span>'}]),
   ['Kohlenhydrate',`g, Limit ${S.settings.carbGoal} g`,ds=>cell(ds,'c')]
  ];
@@ -768,6 +823,7 @@ function reportHTML(){
  const pl=days.filter(d=>d.plan),py=pl.filter(d=>d.plan==='y').length,pt=pl.filter(d=>d.plan==='t').length;
  const kd=days.filter(d=>d.k!=null),kin=kd.filter(d=>d.k>=0.5).length;
  const cd=days.filter(d=>d.c!=null),cOver=cd.filter(d=>d.c>st.carbGoal).length;
+ const bpDays=days.filter(d=>d.sys1!=null||d.sys2!=null),bpTwo=bpDays.filter(d=>d.sys1!=null&&d.sys2!=null).length,bpOne=bpDays.length-bpTwo;
  const months=Math.ceil(N()/30);
  const symC=SYMS.map(s=>{const c=Array(months).fill(0);inR.forEach(([ds,d])=>{if((d.sym||[]).includes(s))c[Math.floor(diffDays(st.start,ds)/30)]++});return [s,c]}).filter(([,c])=>c.some(Boolean));
  const labs=S.labs.filter(r=>r.base||r.end);
@@ -796,6 +852,7 @@ function reportHTML(){
  <p>Im Plan geblieben: ${pl.length?`${py} Tage voll, ${pt} teilweise, ${pl.length-py-pt} nicht (von ${pl.length} Tagen mit Angabe)`:'keine Angaben'}.</p>
  <p>Ketonmessungen: ${kd.length?`${kin} von ${kd.length} bei 0,5 mmol/l oder höher, Mittelwert ${fmt(kd.reduce((s,d)=>s+d.k,0)/kd.length,2)} mmol/l`:'keine'}.</p>
  <p>Kohlenhydrate: ${cd.length?`Ø ${fmt(cd.reduce((s,d)=>s+d.c,0)/cd.length,0)} g/Tag, an ${cOver} von ${cd.length} Tagen über dem Limit`:'keine Angaben'}.</p>
+ <p>Blutdruck an ${bpTwo} Tagen mit zwei Messungen erfasst, an ${bpOne} Tagen mit einer.</p>
  <h2>Kurven</h2><div class="cg">${charts.join('')}</div>
  <h2>Laborwerte</h2>
  ${labs.length?`<table class="data"><thead><tr><th>Parameter</th><th>Einheit</th><th>Normbereich</th><th class="num">Ausgang${S.labDates.base?'<br><span class="small">'+fd(S.labDates.base,{day:'2-digit',month:'2-digit',year:'numeric'})+'</span>':''}</th><th class="num">Abschluss${S.labDates.end?'<br><span class="small">'+fd(S.labDates.end,{day:'2-digit',month:'2-digit',year:'numeric'})+'</span>':''}</th><th class="num">Veränderung</th></tr></thead><tbody>${labs.map(r=>`<tr><td>${esc(r.name)}</td><td>${esc(r.unit)}</td><td>${esc(r.range)||'–'}</td><td class="num">${esc(r.base)||'–'}${isOutOfRange(num(r.base),r.range)?'<sup>*</sup>':''}</td><td class="num">${esc(r.end)||'–'}${isOutOfRange(num(r.end),r.range)?'<sup>*</sup>':''}</td><td class="num">${delta(r.base,r.end,2).replace(/<[^>]+>/g,'')}</td></tr>`).join('')}</tbody></table>${labs.some(r=>isOutOfRange(num(r.base),r.range)||isOutOfRange(num(r.end),r.range))?'<p class="small">* außerhalb des angegebenen Normbereichs</p>':''}`:'<p>Keine Laborwerte eingetragen.</p>'}

@@ -13,7 +13,8 @@ test.describe('Print output', () => {
       const ds = addDays(start, d);
       const medState = {};
       meds.forEach((m) => { medState[m.id] = d % 2 === 0; });
-      state.days[ds] = { w: 82, g: 95, k: 0.8, sys: 120, dia: 80, c: 40, en: 3, hu: 3, plan: 'y', meds: medState, sym: d === 1 ? ['Kopfschmerz'] : undefined, note: d === 1 ? 'Testnotiz' : undefined };
+      // Two full BP readings per day (the taller, realistic case) so the one-page fit is checked against the worst case.
+      state.days[ds] = { w: 82, g: 95, k: 0.8, sys1: 120, dia1: 80, sys2: 118, dia2: 78, c: 40, en: 3, hu: 3, plan: 'y', meds: medState, sym: d === 1 ? ['Kopfschmerz'] : undefined, note: d === 1 ? 'Testnotiz' : undefined };
     }
     state.weeks[1] = { waist: 90, rhr: 64, sleep: 7.2, stress: 27, steps: 8300, note: 'Testnotiz Woche' };
     await seed(page, state);

@@ -44,13 +44,16 @@ test.describe('Plausibility hints', () => {
     await gotoApp(page);
     await seed(page, blankState());
 
-    await page.fill('#f_sys', '80');
-    await page.locator('#f_sys').blur();
-    await page.fill('input[data-f="dia"]', '90');
-    await page.locator('input[data-f="dia"]').blur();
+    await page.fill('#f_sys1', '80');
+    await page.locator('#f_sys1').blur();
+    await page.fill('input[data-f="dia1"]', '90');
+    await page.locator('input[data-f="dia1"]').blur();
 
-    await expect(page.locator('#hint_bp')).toBeVisible();
+    await expect(page.locator('#hint_bp1')).toBeVisible();
     const saved = await page.evaluate(() => S.days[today()]);
+    // reading 1 saved exactly as typed, and with no second reading the derived sys/dia equal it
+    expect(saved.sys1).toBe(80);
+    expect(saved.dia1).toBe(90);
     expect(saved.sys).toBe(80);
     expect(saved.dia).toBe(90);
   });
