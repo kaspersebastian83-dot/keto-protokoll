@@ -113,6 +113,8 @@ td.num,th.num{text-align:right}
 .report .chart{break-inside:avoid;margin:0}
 .report .chart text{font-size:13px}
 .report p{margin:1mm 0}
+.report ul{margin:1mm 0;padding-left:4mm}
+.report li{margin:.5mm 0}
 .report .small{font-size:8.5pt;color:#444}
 .report .qs{white-space:pre-wrap;border:.6pt solid #999;padding:2mm 3mm;min-height:30mm}
 </style>
@@ -183,6 +185,7 @@ const nWeeks=()=>Math.ceil(N()/7);
 const weekRange=n=>{const s=addDays(S.settings.start,(n-1)*7);return [s,addDays(s,6)]};
 const weekOf=ds=>Math.floor(diffDays(S.settings.start,ds)/7)+1;
 function avg(from,to,f){const a=[];for(let i=0;i<=diffDays(from,to);i++){const d=S.days[addDays(from,i)];if(d&&d[f]!=null)a.push(d[f])}return a.length?a.reduce((x,y)=>x+y,0)/a.length:null}
+function countLogged(from,to,f){let n=0;for(let i=0;i<=diffDays(from,to);i++){const d=S.days[addDays(from,i)];if(d&&d[f]!=null)n++}return n}
 function prevLoggedValue(field,beforeDate){const dates=Object.keys(S.days).filter(ds=>ds<beforeDate&&S.days[ds][field]!=null).sort();return dates.length?S.days[dates[dates.length-1]][field]:null}
 function checkPlausibility(field,value,ref){
  if(value==null)return null;
@@ -392,6 +395,75 @@ function sheetHTML(wn,fill){
  <p class="foot">Morgens messen, nach dem Aufstehen, vor Frühstück und Kaffee. Blutdruck sitzend nach 5 Minuten Ruhe. Einmal pro Woche ins Protokoll übertragen.</p></div>`;
 }
 
+function generateTalkingPoints(){
+ const st=S.settings,start=st.start,end=addDays(start,N()-1),pts=[];
+ const daysInRange=Object.entries(S.days).filter(([ds,d])=>{const i=diffDays(start,ds);return i>=0&&i<N()&&Object.keys(d).length});
+
+ const avgWeek=(n,f)=>{const [a,b]=weekRange(n);return avg(a,b,f)};
+ const findTrendStart=(weeklyVals,threshold)=>{
+  if(weeklyVals.length<4)return null;
+  const baseline=(weeklyVals[0][1]+weeklyVals[1][1])/2;
+  for(let i=2;i<=weeklyVals.length-2;i++){
+   const dir=Math.sign(weeklyVals[i][1]-baseline);
+   if(dir===0)continue;
+   let ok=true;
+   for(let j=i;j<weeklyVals.length;j++){
+    const diff=weeklyVals[j][1]-baseline;
+    if(Math.sign(diff)!==dir||Math.abs(diff)<=threshold){ok=false;break}
+   }
+   if(ok){const seg=weeklyVals.slice(i);return {week:weeklyVals[i][0],baseline,current:seg.reduce((s,v)=>s+v[1],0)/seg.length,dir}}
+  }
+  return null;
+ };
+ const TREND=[
+  ['Gewicht','kg',2,1,n=>avgWeek(n,'w')],
+  ['Blutdruck systolisch','mmHg',5,0,n=>avgWeek(n,'sys')],
+  ['Blutdruck diastolisch','mmHg',3,0,n=>avgWeek(n,'dia')],
+  ['Ketone','mmol/l',0.3,2,n=>avgWeek(n,'k')],
+  ['Ruhepuls','/min',3,0,n=>{const w=S.weeks[n];return w&&w.rhr!=null?w.rhr:null}]
+ ];
+ TREND.forEach(([label,unit,threshold,dec,get])=>{
+  const weeklyVals=[];
+  for(let n=1;n<=nWeeks();n++){const v=get(n);if(v!=null)weeklyVals.push([n,v])}
+  const t=findTrendStart(weeklyVals,threshold);
+  if(t)pts.push(`${label} seit Woche ${t.week} spürbar ${t.dir>0?'höher':'niedriger'} als in den ersten beiden Wochen (Ø ${fmt(t.baseline,dec)} vs. Ø ${fmt(t.current,dec)} ${unit}).`);
+ });
+
+ const over=[],under=[];
+ daysInRange.forEach(([,d])=>{if(d.c!=null&&d.k!=null)(d.c>st.carbGoal?over:under).push(d.k)});
+ if(over.length>=5&&under.length>=5){
+  const avgOver=over.reduce((s,v)=>s+v,0)/over.length,avgUnder=under.reduce((s,v)=>s+v,0)/under.length;
+  if(Math.abs(avgOver-avgUnder)>=0.3)pts.push(`An Tagen über dem Kohlenhydrat-Limit lagen die Ketonwerte im Schnitt bei Ø ${fmt(avgOver,2)} mmol/l, an Tagen im Limit bei Ø ${fmt(avgUnder,2)} mmol/l.`);
+ }
+
+ const half=N()/2;
+ SYMS.forEach(s=>{
+  const occ=daysInRange.filter(([,d])=>(d.sym||[]).includes(s));
+  if(occ.length<3)return;
+  const firstHalf=occ.filter(([ds])=>diffDays(start,ds)<half).length,secondHalf=occ.length-firstHalf;
+  if(Math.abs(firstHalf-secondHalf)>=2)pts.push(`${s} in der ersten Hälfte an ${firstHalf} Tagen genannt, in der zweiten Hälfte an ${secondHalf} Tagen.`);
+ });
+
+ [...S.doseChanges].sort((a,b)=>a.date<b.date?-1:a.date>b.date?1:0).forEach(c=>{
+  const beforeStart=addDays(c.date,-7),beforeEnd=addDays(c.date,-1),afterStart=addDays(c.date,1),afterEnd=addDays(c.date,7);
+  if(countLogged(beforeStart,beforeEnd,'sys')<4||countLogged(afterStart,afterEnd,'sys')<4)return;
+  const sysBefore=avg(beforeStart,beforeEnd,'sys'),sysAfter=avg(afterStart,afterEnd,'sys');
+  const diaBefore=avg(beforeStart,beforeEnd,'dia'),diaAfter=avg(afterStart,afterEnd,'dia');
+  const sysDiff=Math.abs(sysAfter-sysBefore),diaDiff=(diaBefore!=null&&diaAfter!=null)?Math.abs(diaAfter-diaBefore):0;
+  if(sysDiff>=5||diaDiff>=3){
+   const med=st.meds.find(m=>m.id===c.medId);
+   pts.push(`Nach Anpassung von ${esc(med?med.name:'einem Medikament')} am ${fd(c.date)} (auf ${esc(c.newDose)}) lag der Blutdruck in den Folgetagen bei Ø ${fmt(sysAfter,0)} statt zuvor Ø ${fmt(sysBefore,0)} mmHg (sys).`);
+  }
+ });
+
+ [['w','Gewicht'],['g','Blutzucker'],['k','Ketone'],['sys','Blutdruck']].forEach(([f,label])=>{
+  const pct=countLogged(start,end,f)/N()*100;
+  if(pct<70)pts.push(`${label} an nur ${fmt(pct,0)}% der Tage erfasst — die obigen Trends basieren entsprechend auf weniger Werten.`);
+ });
+
+ return pts;
+}
+
 function reportHTML(){
  const st=S.settings,end=addDays(st.start,N()-1);
  const inR=Object.entries(S.days).filter(([ds,d])=>{const i=diffDays(st.start,ds);return i>=0&&i<N()&&Object.keys(d).length});
@@ -410,6 +482,7 @@ function reportHTML(){
  const wn=Object.keys(S.weeks).map(Number).sort((a,b)=>a-b).filter(n=>S.weeks[n].note);
  const dn=inR.filter(([,d])=>d.note).sort((a,b)=>a[0]<b[0]?-1:1);
  const charts=chartSet().filter((_,i)=>i!==4&&i!==6);
+ const talkingPoints=generateTalkingPoints();
  return `<div class="report">
  <h1>Keto-Protokoll: Zusammenfassung</h1>
  <p>${st.name?esc(st.name)+', ':''}Zeitraum ${fd(st.start,{day:'numeric',month:'long',year:'numeric'})} bis ${fd(end,{day:'numeric',month:'long',year:'numeric'})}. Einträge an ${inR.length} von ${N()} Tagen. Kohlenhydrat-Limit ${st.carbGoal} g/Tag.</p>
@@ -430,6 +503,9 @@ function reportHTML(){
  <h2>Beschwerden</h2>
  ${symC.length?`<table><thead><tr><th>Beschwerde</th>${Array.from({length:months},(_,i)=>`<th class="num">Tage ${i*30+1}–${Math.min((i+1)*30,N())}</th>`).join('')}</tr></thead><tbody>${symC.map(([s,c])=>`<tr><td>${s}</td>${c.map(x=>`<td class="num">${x||''}</td>`).join('')}</tr>`).join('')}</tbody></table>`:'<p>Keine Beschwerden notiert.</p>'}
  ${wn.length||dn.length?`<h2>Notizen</h2>${wn.map(n=>`<p><b>Woche ${n}:</b> ${esc(S.weeks[n].note)}</p>`).join('')}${dn.length?`<p class="small" style="margin-top:2mm">${dn.map(([ds,d])=>`<b>${fd(ds)}</b> ${esc(d.note)}`).join(' &nbsp; ')}</p>`:''}`:''}
+ <h2>Beobachtungen für das Gespräch</h2>
+ <p class="small">Beobachtungen aus den erfassten Daten, keine medizinische Bewertung — als Gesprächsgrundlage gedacht.</p>
+ ${talkingPoints.length?`<ul>${talkingPoints.map(p=>`<li>${p}</li>`).join('')}</ul>`:'<p>Keine auffälligen Muster in diesem Zeitraum.</p>'}
  <h2>Fragen für die Besprechung</h2><div class="qs">${esc(st.questions)}</div>
  </div>`;
 }
