@@ -262,7 +262,7 @@ Preferred workflow:
 
 - [x] Add `AGENTS.md`
 - [x] Add `PROJECT.md`
-- [ ] Update `README.md`
+- [x] Update `README.md`
 - [ ] Review obsolete development branches
 - [ ] Adopt feature-branch and pull-request workflow
 
