@@ -1,0 +1,11 @@
+# Personal health data – never commit backups or exports
+*.json
+*.csv
+backup/
+exports/
+
+# OS / editor
+.DS_Store
+Thumbs.db
+.vscode/
+.idea/

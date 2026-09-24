@@ -1,0 +1,461 @@
+<!doctype html>
+<html lang="de">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Keto-Protokoll</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;500;600&display=swap" rel="stylesheet">
+<style id="pagestyle">@page{size:A4 portrait;margin:12mm}</style>
+<style>
+:root{--paper:#FAFCFE;--grid:#E6EDF5;--ink:#1D3A6B;--text:#22272E;--muted:#667281;--line:#C9D4E0;--field:#FFFFFF;--keto:#0F7F73;--ketoBand:rgba(15,127,115,.13);--s2:#B4541F;--warn:#B42318;color-scheme:light dark}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]){--paper:#11161D;--grid:#19212B;--ink:#9CB9EA;--text:#E3E8EF;--muted:#8E99A8;--line:#2C3744;--field:#161D26;--keto:#4FC7B6;--ketoBand:rgba(79,199,182,.15);--s2:#E89A63;--warn:#F07A6E}}
+:root[data-theme="dark"]{--paper:#11161D;--grid:#19212B;--ink:#9CB9EA;--text:#E3E8EF;--muted:#8E99A8;--line:#2C3744;--field:#161D26;--keto:#4FC7B6;--ketoBand:rgba(79,199,182,.15);--s2:#E89A63;--warn:#F07A6E}
+:root{box-sizing:border-box;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}
+*,*::before,*::after{box-sizing:inherit}
+html{scroll-padding-top:env(safe-area-inset-top,0px)}
+body{margin:0;background-color:var(--paper);background-image:linear-gradient(var(--grid) 1px,transparent 1px),linear-gradient(90deg,var(--grid) 1px,transparent 1px);background-size:24px 24px;color:var(--text);font:16px/1.5 "IBM Plex Sans",system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;font-variant-numeric:tabular-nums}
+.wrap{max-width:760px;margin:0 auto;padding:16px 16px 64px}
+header h1{font-weight:600;font-size:1.7rem;line-height:1.2;color:var(--ink);margin:4px 0 2px;letter-spacing:-.01em}
+.sub{color:var(--muted);font-size:.9rem;margin:0}
+.nudge{font-size:.85rem;color:var(--s2);margin:4px 0 0}
+.nudge button{font:inherit;color:inherit;background:none;border:0;padding:0;text-decoration:underline;cursor:pointer}
+.strip{display:grid;grid-template-columns:repeat(30,1fr);gap:3px;margin:12px 0 16px}
+.strip button{aspect-ratio:1;border:1px solid var(--line);background:var(--field);border-radius:2px;padding:0;cursor:pointer;min-width:0}
+.strip .part{background:var(--ketoBand);border-color:var(--keto)}
+.strip .done{background:var(--keto);border-color:var(--keto)}
+.strip .today{outline:2px solid var(--ink);outline-offset:1px}
+.strip .cur{border:2px solid var(--s2)}
+nav{display:flex;gap:2px;overflow-x:auto;border-bottom:2px solid var(--ink);margin-bottom:16px;position:sticky;top:env(safe-area-inset-top,0px);background:var(--paper);z-index:5}
+nav button{border:0;background:none;padding:10px 12px;font:inherit;color:var(--muted);cursor:pointer;border-bottom:3px solid transparent;margin-bottom:-2px;white-space:nowrap}
+nav button[aria-selected="true"]{color:var(--ink);border-bottom-color:var(--ink);font-weight:600}
+.panel{background:var(--field);border:1px solid var(--line);border-radius:6px;padding:14px 16px;margin-bottom:16px}
+.panel h2{font-size:1.05rem;font-weight:600;color:var(--ink);margin:0 0 4px}
+.row{display:grid;grid-template-columns:1fr 170px;align-items:center;gap:12px;padding:9px 0;border-bottom:1px dashed var(--line)}
+.row:last-child{border-bottom:0}
+.row.wide{grid-template-columns:1fr}
+.row label b{display:block;font-weight:500}
+.row label small,.row .lbl small{color:var(--muted);font-size:.82rem}
+.row .lbl b{display:block;font-weight:500}
+.inp{display:flex;align-items:center;gap:6px}
+input,textarea,select{font:inherit;color:var(--text);background:var(--paper);border:1px solid var(--line);border-radius:4px;padding:8px;width:100%;min-width:0}
+textarea{min-height:64px;resize:vertical}
+.unit{color:var(--muted);font-size:.82rem;min-width:3.6em}
+:focus-visible{outline:2px solid var(--ink);outline-offset:2px}
+.scale,.seg{display:flex;gap:4px}
+.scale button,.seg button,.chips button,.btn{border:1px solid var(--line);background:var(--paper);border-radius:4px;font:inherit;color:var(--text);cursor:pointer;padding:8px 10px}
+.scale button,.seg button{flex:1;padding:8px 0}
+.scale button.on,.seg button.on{background:var(--ink);color:var(--paper);border-color:var(--ink)}
+.chips{display:flex;flex-wrap:wrap;gap:6px;margin-top:6px}
+.chips button{border-radius:999px;padding:5px 12px;font-size:.9rem}
+.chips button.on{background:var(--s2);border-color:var(--s2);color:#fff}
+.btn.primary{background:var(--ink);color:var(--paper);border-color:var(--ink);font-weight:500}
+.btn.danger{color:var(--warn);border-color:var(--warn)}
+.btns{display:flex;flex-wrap:wrap;gap:8px;margin-top:10px}
+.datebar{display:flex;align-items:center;gap:8px;margin-bottom:6px}
+.datebar input{flex:1}
+.datebar .btn{min-width:44px;font-size:1.2rem;padding:6px 0}
+.scroll{overflow-x:auto}
+table{width:100%;border-collapse:collapse;font-size:.92rem}
+th,td{padding:6px;border-bottom:1px solid var(--line);text-align:left;vertical-align:middle}
+th{font-weight:500;color:var(--muted)}
+td.num,th.num{text-align:right}
+.labtbl input{padding:5px 6px}
+.labtbl td{padding:4px}
+.up{color:var(--s2)}.down{color:var(--keto)}
+.chart{margin:0 0 18px}
+.chart figcaption{font-weight:500;margin-bottom:2px}
+.chart svg{width:100%;height:auto;display:block}
+.gl{stroke:var(--line);stroke-width:1}
+.chart text{fill:var(--muted);font-size:11px;font-family:inherit}
+.s1,.s2,.s3{fill:none;stroke-width:2;stroke-linejoin:round}
+.s1{stroke:var(--ink)}.s1d{fill:var(--ink)}
+.s2{stroke:var(--s2)}.s2d{fill:var(--s2)}
+.s3{stroke:var(--keto)}.s3d{fill:var(--keto)}
+.band{fill:var(--ketoBand)}
+.goal{stroke:var(--warn);stroke-dasharray:5 4;stroke-width:1.3}
+.key{display:inline-block;width:14px;height:3px;vertical-align:middle;margin:0 4px 0 10px}
+#status{position:fixed;right:12px;bottom:calc(12px + env(safe-area-inset-bottom,0px));background:var(--ink);color:var(--paper);padding:6px 12px;border-radius:4px;font-size:.9rem;opacity:0;transition:opacity .2s;pointer-events:none}
+#status.show{opacity:1}
+[hidden]{display:none!important}
+@media (max-width:540px){.row{grid-template-columns:1fr 140px}.strip{grid-template-columns:repeat(15,1fr)}header h1{font-size:1.45rem}}
+@media (prefers-reduced-motion:reduce){*{transition:none!important}}
+#print{display:none}
+
+/* ---------- print ---------- */
+@media print{
+ :root,:root:not([data-theme="light"]),:root[data-theme="dark"]{--paper:#fff;--grid:#fff;--ink:#1D3A6B;--text:#000;--muted:#555;--line:#bbb;--field:#fff;--keto:#0F7F73;--ketoBand:rgba(15,127,115,.13);--s2:#B4541F;--warn:#B42318}
+ :root{padding:0}
+ body{background:#fff;color:#000;font-size:10.5pt}
+ body>*:not(#print){display:none!important}
+ #print{display:block}
+}
+.sheet h2{font-size:15pt;margin:0;color:#1D3A6B}
+.sheet .sh{display:flex;justify-content:space-between;align-items:baseline;margin-bottom:3mm}
+.sheet table{table-layout:fixed;width:100%;border-collapse:collapse}
+.sheet th,.sheet td{border:.6pt solid #666;padding:1mm 2mm;color:#000}
+.sheet thead th{text-align:center;font-weight:600;font-size:10pt;height:9mm}
+.sheet tbody th{width:40mm;text-align:left;font-weight:600;font-size:10pt}
+.sheet th small{display:block;font-weight:400;color:#555;font-size:7.5pt}
+.sheet tbody td{height:11mm;text-align:center;font-size:12pt}
+.sheet .opts{color:#999;font-size:9pt;letter-spacing:1.6mm}
+.sheet tr.tall td{height:17mm}
+.sheet .wk{display:grid;grid-template-columns:repeat(5,1fr) 2.2fr;gap:2.5mm;margin-top:3.5mm}
+.sheet .wk div{border:.6pt solid #666;padding:1.2mm 2mm;min-height:15mm;font-size:8.5pt;color:#333}
+.sheet .wk b{display:block;font-size:11pt;color:#000;margin-top:1mm}
+.sheet .foot{font-size:7.5pt;color:#555;margin-top:2mm}
+.report h1{font-size:17pt;color:#1D3A6B;margin:0 0 1mm}
+.report h2{font-size:12pt;color:#1D3A6B;border-bottom:.8pt solid #1D3A6B;padding-bottom:1mm;margin:6mm 0 2mm;break-after:avoid}
+.report table{font-size:9.5pt}
+.report th,.report td{padding:1.2mm 2mm;border-bottom:.5pt solid #bbb;color:#000}
+.report .cg{display:grid;grid-template-columns:1fr 1fr;gap:4mm 6mm}
+.report .chart{break-inside:avoid;margin:0}
+.report .chart text{font-size:13px}
+.report p{margin:1mm 0}
+.report .small{font-size:8.5pt;color:#444}
+.report .qs{white-space:pre-wrap;border:.6pt solid #999;padding:2mm 3mm;min-height:30mm}
+</style>
+</head>
+<body>
+<div class="wrap">
+ <header>
+  <h1>Keto-Protokoll</h1>
+  <p class="sub" id="hsub"></p>
+  <p class="nudge" id="nudge" hidden></p>
+ </header>
+ <div class="strip" id="strip" aria-label="Übersicht aller Tage"></div>
+ <nav role="tablist">
+  <button role="tab" data-tab="day" aria-selected="true">Heute</button>
+  <button role="tab" data-tab="week" aria-selected="false">Woche</button>
+  <button role="tab" data-tab="lab" aria-selected="false">Labor</button>
+  <button role="tab" data-tab="trend" aria-selected="false">Verlauf</button>
+  <button role="tab" data-tab="print" aria-selected="false">Drucken</button>
+  <button role="tab" data-tab="set" aria-selected="false">Einstellungen</button>
+ </nav>
+ <main>
+  <section id="v-day"></section>
+  <section id="v-week" hidden></section>
+  <section id="v-lab" hidden></section>
+  <section id="v-trend" hidden></section>
+  <section id="v-print" hidden></section>
+  <section id="v-set" hidden></section>
+ </main>
+</div>
+<div id="status" role="status" aria-live="polite"></div>
+<div id="print"></div>
+<input type="file" id="importFile" accept=".json,application/json" hidden>
+
+<script>
+const KEY='ketoProtokoll_v1';
+const SYMS=['Kopfschmerz','Müdigkeit','Muskelkrämpfe','Verdauung','Schwindel','Schlecht geschlafen','Heißhunger','Herzklopfen','Gereizt'];
+const DEFAULT_LABS=[['HbA1c','%'],['Glukose nüchtern','mg/dl'],['Gesamtcholesterin','mg/dl'],['LDL-Cholesterin','mg/dl'],['HDL-Cholesterin','mg/dl'],['Triglyzeride','mg/dl'],['Harnsäure','mg/dl'],['Kreatinin','mg/dl'],['eGFR','ml/min'],['GPT (ALT)','U/l'],['GOT (AST)','U/l'],['Gamma-GT','U/l'],['Natrium','mmol/l'],['Kalium','mmol/l'],['Magnesium','mmol/l'],['TSH','mU/l'],['CRP','mg/l']];
+const $=s=>document.querySelector(s);
+
+/* ---------- helpers ---------- */
+const iso=d=>d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0');
+const today=()=>iso(new Date());
+const pd=s=>{const [y,m,d]=s.split('-').map(Number);return new Date(y,m-1,d)};
+const addDays=(s,n)=>{const d=pd(s);d.setDate(d.getDate()+n);return iso(d)};
+const diffDays=(a,b)=>Math.round((pd(b)-pd(a))/864e5);
+const fd=(s,o)=>pd(s).toLocaleDateString('de-DE',o||{day:'2-digit',month:'2-digit'});
+const esc=s=>String(s??'').replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
+const num=v=>{if(v==null||String(v).trim()==='')return null;const n=parseFloat(String(v).replace(',','.'));return isNaN(n)?null:n};
+const fmt=(n,d=1)=>n==null||isNaN(n)?'–':n.toLocaleString('de-DE',{maximumFractionDigits:d});
+const vv=x=>x==null?'':String(x).replace('.',',');
+
+let S;
+function load(){
+ try{S=JSON.parse(localStorage.getItem(KEY))}catch(e){S=null}
+ if(!S||!S.settings){S={settings:{name:'',start:today(),days:90,carbGoal:50,questions:'',lastBackup:null},days:{},weeks:{},labs:DEFAULT_LABS.map(([n,u])=>({name:n,unit:u,base:'',end:''})),labDates:{base:today(),end:''}}}
+}
+let stT;
+function save(msg){
+ try{localStorage.setItem(KEY,JSON.stringify(S));status(msg||'Gespeichert')}
+ catch(e){status('Speichern fehlgeschlagen – bitte Backup exportieren')}
+}
+function status(t){const el=$('#status');el.textContent=t;el.classList.add('show');clearTimeout(stT);stT=setTimeout(()=>el.classList.remove('show'),1400)}
+const N=()=>Math.max(7,Number(S.settings.days)||90);
+const nWeeks=()=>Math.ceil(N()/7);
+const weekRange=n=>{const s=addDays(S.settings.start,(n-1)*7);return [s,addDays(s,6)]};
+const weekOf=ds=>Math.floor(diffDays(S.settings.start,ds)/7)+1;
+function avg(from,to,f){const a=[];for(let i=0;i<=diffDays(from,to);i++){const d=S.days[addDays(from,i)];if(d&&d[f]!=null)a.push(d[f])}return a.length?a.reduce((x,y)=>x+y,0)/a.length:null}
+const getDay=ds=>S.days[ds]||(S.days[ds]={});
+const getWeek=n=>S.weeks[n]||(S.weeks[n]={});
+
+let curDate=today(), curTab='day';
+let curWeek=1;
+
+/* ---------- header + strip ---------- */
+function renderHead(){
+ const st=S.settings,t=today(),i=diffDays(st.start,t)+1;
+ $('#hsub').textContent=(st.name?st.name+', ':'')+(i<1?`Start am ${fd(st.start,{day:'numeric',month:'long'})}`:i>N()?`Zeitraum abgeschlossen (${N()} Tage)`:`Tag ${i} von ${N()}, Woche ${Math.ceil(i/7)}`);
+ let h='';
+ for(let k=0;k<N();k++){const ds=addDays(st.start,k),d=S.days[ds];const n=d?['w','g','k','sys','c'].filter(f=>d[f]!=null).length:0;
+  h+=`<button type="button" data-date="${ds}" class="${n>=4?'done':n?'part':''}${ds===t?' today':''}${ds===curDate&&curTab==='day'?' cur':''}" title="Tag ${k+1}, ${fd(ds)}" aria-label="Tag ${k+1}, ${fd(ds)}"></button>`}
+ $('#strip').innerHTML=h;
+ const logged=Object.values(S.days).filter(d=>Object.keys(d).length).length;
+ const lb=st.lastBackup?diffDays(st.lastBackup,t):null;
+ const nd=$('#nudge');
+ if(logged>=5&&(lb===null||lb>=7)){nd.hidden=false;nd.innerHTML=`${lb===null?'Noch kein Backup gemacht.':`Letztes Backup vor ${lb} Tagen.`} <button type="button" data-goto="set">Jetzt sichern</button>`}else nd.hidden=true;
+}
+
+/* ---------- day ---------- */
+function numRow(f,label,hint,unit,d,mode='decimal'){
+ return `<div class="row"><label for="f_${f}"><b>${label}</b><small>${hint}</small></label><div class="inp"><input id="f_${f}" data-f="${f}" type="text" inputmode="${mode}" autocomplete="off" value="${vv(d[f])}"><span class="unit">${unit}</span></div></div>`}
+function scaleRow(f,label,hint,d){
+ return `<div class="row"><div class="lbl"><b>${label}</b><small>${hint}</small></div><div class="scale" role="group" aria-label="${label}">${[1,2,3,4,5].map(n=>`<button type="button" data-scale="${f}" data-v="${n}" class="${d[f]===n?'on':''}" aria-pressed="${d[f]===n}">${n}</button>`).join('')}</div></div>`}
+function renderDay(){
+ const d=S.days[curDate]||{},i=diffDays(S.settings.start,curDate),inR=i>=0&&i<N();
+ let h=`<div class="datebar"><button type="button" class="btn" data-nav="-1" aria-label="Vorheriger Tag">‹</button><input type="date" id="dpick" value="${curDate}" aria-label="Datum"><button type="button" class="btn" data-nav="1" aria-label="Nächster Tag">›</button>${curDate!==today()?'<button type="button" class="btn" data-nav="0">Heute</button>':''}</div>
+ <p class="sub" style="margin-bottom:12px">${fd(curDate,{weekday:'long',day:'numeric',month:'long'})}${inR?`, Tag ${i+1}`:', außerhalb des Zeitraums'}</p>
+ <div class="panel"><h2>Morgens, nüchtern</h2>
+ ${numRow('w','Gewicht','nach dem Aufstehen','kg',d)}
+ ${numRow('g','Blutzucker','vor Frühstück und Kaffee','mg/dl',d,'numeric')}
+ ${numRow('k','Ketone','Blutmessung','mmol/l',d)}
+ <div class="row"><label for="f_sys"><b>Blutdruck</b><small>sitzend, nach 5 min Ruhe</small></label><div class="inp"><input id="f_sys" data-f="sys" type="text" inputmode="numeric" placeholder="sys" value="${vv(d.sys)}" aria-label="systolisch"><span>/</span><input data-f="dia" type="text" inputmode="numeric" placeholder="dia" value="${vv(d.dia)}" aria-label="diastolisch"></div></div>
+ ${numRow('p','Puls','optional, vom Blutdruckgerät','/min',d,'numeric')}
+ </div>
+ <div class="panel"><h2>Über den Tag</h2>
+ ${numRow('c','Kohlenhydrate',`grob geschätzt, Limit ${S.settings.carbGoal} g`,'g',d,'numeric')}
+ ${scaleRow('en','Energie','1 schlapp, 5 topfit',d)}
+ ${scaleRow('hu','Hunger','1 kaum, 5 stark',d)}
+ <div class="row"><div class="lbl"><b>Im Plan geblieben?</b></div><div class="seg" role="group" aria-label="Im Plan geblieben">${[['y','Ja'],['t','Teils'],['n','Nein']].map(([k,l])=>`<button type="button" data-plan="${k}" class="${d.plan===k?'on':''}" aria-pressed="${d.plan===k}">${l}</button>`).join('')}</div></div>
+ <div class="row wide"><div class="lbl"><b>Beschwerden</b><small>antippen, was heute auffiel</small></div><div class="chips">${SYMS.map(s=>{const on=(d.sym||[]).includes(s);return `<button type="button" data-sym="${esc(s)}" class="${on?'on':''}" aria-pressed="${on}">${s}</button>`}).join('')}</div></div>
+ <div class="row wide"><label for="f_note"><b>Notiz</b><small>optional</small></label><textarea id="f_note" data-t="note">${esc(d.note)}</textarea></div>
+ </div>`;
+ $('#v-day').innerHTML=h;
+}
+$('#v-day').addEventListener('change',e=>{
+ const t=e.target;
+ if(t.id==='dpick'){if(t.value){curDate=t.value;renderDay();renderHead()}return}
+ const d=getDay(curDate);
+ if(t.dataset.f){const n=num(t.value);if(t.value.trim()!==''&&n===null){status('Bitte eine Zahl eingeben');return}if(n===null)delete d[t.dataset.f];else d[t.dataset.f]=n}
+ else if(t.dataset.t){const v=t.value.trim();if(v)d[t.dataset.t]=v;else delete d[t.dataset.t]}
+ save();renderHead();
+});
+$('#v-day').addEventListener('click',e=>{
+ const b=e.target.closest('button');if(!b)return;
+ if(b.dataset.nav!=null){const n=+b.dataset.nav;curDate=n===0?today():addDays(curDate,n);renderDay();renderHead();return}
+ const d=getDay(curDate);
+ if(b.dataset.scale){const f=b.dataset.scale,v=+b.dataset.v;if(d[f]===v)delete d[f];else d[f]=v}
+ else if(b.dataset.plan){d.plan=d.plan===b.dataset.plan?undefined:b.dataset.plan;if(!d.plan)delete d.plan}
+ else if(b.dataset.sym){const s=b.dataset.sym;d.sym=d.sym||[];d.sym=d.sym.includes(s)?d.sym.filter(x=>x!==s):[...d.sym,s];if(!d.sym.length)delete d.sym}
+ else return;
+ save();const y=window.scrollY;renderDay();window.scrollTo(0,y);renderHead();
+});
+
+/* ---------- week ---------- */
+const WF=[['waist','Bauchumfang','auf Nabelhöhe, morgens','cm'],['rhr','Ruhepuls','Garmin, Ø der Woche','/min'],['sleep','Schlaf','Garmin, Ø pro Nacht','h'],['stress','Stress','Garmin, Ø der Woche','0–100'],['steps','Schritte','Garmin, Ø pro Tag','/Tag']];
+function renderWeek(){
+ const w=S.weeks[curWeek]||{},[a,b]=weekRange(curWeek);
+ const avgs=[['Gewicht','w','kg',1],['Blutzucker','g','mg/dl',0],['Ketone','k','mmol/l',2],['Blutdruck sys','sys','mmHg',0],['Blutdruck dia','dia','mmHg',0],['Kohlenhydrate','c','g',0],['Energie','en','',1],['Hunger','hu','',1]];
+ let h=`<div class="datebar"><button type="button" class="btn" data-wnav="-1" aria-label="Vorherige Woche">‹</button><select id="wsel" aria-label="Woche">${Array.from({length:nWeeks()},(_,i)=>`<option value="${i+1}" ${i+1===curWeek?'selected':''}>Woche ${i+1}</option>`).join('')}</select><button type="button" class="btn" data-wnav="1" aria-label="Nächste Woche">›</button></div>
+ <p class="sub" style="margin-bottom:12px">${fd(a,{day:'numeric',month:'long'})} bis ${fd(b,{day:'numeric',month:'long'})}</p>
+ <div class="panel"><h2>Einmal pro Woche</h2><p class="sub">Die Garmin-Werte liest du in Garmin Connect in der Wochenansicht ab.</p>
+ ${WF.map(([f,l,hint,u])=>`<div class="row"><label for="w_${f}"><b>${l}</b><small>${hint}</small></label><div class="inp"><input id="w_${f}" data-wf="${f}" type="text" inputmode="decimal" value="${vv(w[f])}"><span class="unit">${u}</span></div></div>`).join('')}
+ <div class="row wide"><label for="w_note"><b>Wochennotiz</b><small>Wie lief die Woche? Was ist aufgefallen?</small></label><textarea id="w_note" data-wt="note">${esc(w.note)}</textarea></div></div>
+ <div class="panel"><h2>Durchschnitt aus deinen Tageswerten</h2><table>${avgs.map(([l,f,u,dd])=>`<tr><td>${l}</td><td class="num">${fmt(avg(a,b,f),dd)} <span class="unit">${u}</span></td></tr>`).join('')}</table></div>`;
+ $('#v-week').innerHTML=h;
+}
+$('#v-week').addEventListener('change',e=>{
+ const t=e.target;
+ if(t.id==='wsel'){curWeek=+t.value;renderWeek();return}
+ const w=getWeek(curWeek);
+ if(t.dataset.wf){const n=num(t.value);if(t.value.trim()!==''&&n===null){status('Bitte eine Zahl eingeben');return}if(n===null)delete w[t.dataset.wf];else w[t.dataset.wf]=n}
+ else if(t.dataset.wt){const v=t.value.trim();if(v)w.note=v;else delete w.note}
+ save();
+});
+$('#v-week').addEventListener('click',e=>{const b=e.target.closest('[data-wnav]');if(!b)return;curWeek=Math.min(nWeeks(),Math.max(1,curWeek+ +b.dataset.wnav));renderWeek()});
+
+/* ---------- lab ---------- */
+function delta(a,b,d=1){const x=num(a),y=num(b);if(x==null||y==null)return '';const dv=y-x;if(dv===0)return '±0';return `<span class="${dv>0?'up':'down'}">${dv>0?'+':'−'}${fmt(Math.abs(dv),d)}</span>`}
+function renderLab(){
+ const L=S.labs;
+ $('#v-lab').innerHTML=`<div class="panel"><h2>Laborwerte</h2><p class="sub">Aus dem Befund übertragen, Einheiten wie im Befund. Eigene Werte kannst du unten ergänzen.</p>
+ <div class="row"><label for="lb_base"><b>Ausgangswert vom</b></label><input id="lb_base" type="date" data-ld="base" value="${S.labDates.base||''}"></div>
+ <div class="row"><label for="lb_end"><b>Abschlusswert vom</b></label><input id="lb_end" type="date" data-ld="end" value="${S.labDates.end||''}"></div></div>
+ <div class="panel scroll"><table class="labtbl"><thead><tr><th>Parameter</th><th>Einheit</th><th class="num">Ausgang</th><th class="num">Abschluss</th><th class="num">Δ</th><th></th></tr></thead><tbody>
+ ${L.map((r,i)=>`<tr><td><input data-li="${i}" data-lk="name" value="${esc(r.name)}" aria-label="Parameter"></td><td style="width:90px"><input data-li="${i}" data-lk="unit" value="${esc(r.unit)}" aria-label="Einheit"></td><td style="width:90px"><input data-li="${i}" data-lk="base" inputmode="decimal" value="${esc(r.base)}" aria-label="${esc(r.name)} Ausgang"></td><td style="width:90px"><input data-li="${i}" data-lk="end" inputmode="decimal" value="${esc(r.end)}" aria-label="${esc(r.name)} Abschluss"></td><td class="num" style="width:60px">${delta(r.base,r.end,2)}</td><td style="width:36px"><button type="button" class="btn" data-ldel="${i}" aria-label="${esc(r.name)} entfernen" style="padding:4px 8px">✕</button></td></tr>`).join('')}
+ </tbody></table><div class="btns"><button type="button" class="btn" id="labAdd">Parameter hinzufügen</button></div></div>`;
+}
+$('#v-lab').addEventListener('change',e=>{
+ const t=e.target;
+ if(t.dataset.ld){S.labDates[t.dataset.ld]=t.value;save();return}
+ if(t.dataset.li!=null){S.labs[+t.dataset.li][t.dataset.lk]=t.value.trim();save();if(t.dataset.lk==='base'||t.dataset.lk==='end')renderLab()}
+});
+$('#v-lab').addEventListener('click',e=>{
+ const b=e.target.closest('button');if(!b)return;
+ if(b.id==='labAdd'){S.labs.push({name:'',unit:'',base:'',end:''});save();renderLab();const ins=document.querySelectorAll('#v-lab input[data-lk="name"]');ins[ins.length-1].focus()}
+ else if(b.dataset.ldel!=null){const r=S.labs[+b.dataset.ldel];if((r.base||r.end)&&!confirm(`„${r.name}" mit eingetragenen Werten entfernen?`))return;S.labs.splice(+b.dataset.ldel,1);save('Entfernt');renderLab()}
+});
+
+/* ---------- charts ---------- */
+const ser=f=>Object.entries(S.days).map(([ds,d])=>[diffDays(S.settings.start,ds),d[f]]).filter(p=>p[1]!=null&&p[0]>=0&&p[0]<N());
+const wser=f=>Object.entries(S.weeks).map(([n,w])=>[(n-1)*7+3,w[f]]).filter(p=>p[1]!=null&&p[0]<N());
+function chart(title,series,o={}){
+ const pts=series.flatMap(s=>s.pts);
+ const cap=`<figcaption>${title}${o.unit?` <span class="sub">(${o.unit})</span>`:''}</figcaption>`;
+ if(!pts.length)return `<figure class="chart">${cap}<p class="sub">Noch keine Werte.</p></figure>`;
+ const n=N(),W=600,H=o.h||170,L=44,R=10,T=10,B=22;
+ const ys=pts.map(p=>p[1]);if(o.band)ys.push(...o.band);if(o.goal!=null)ys.push(o.goal);
+ let lo=Math.min(...ys),hi=Math.max(...ys),pad=(hi-lo)*.15;if(!pad)pad=Math.abs(hi)*.05||1;lo-=pad;hi+=pad;
+ const X=x=>L+x/(n-1)*(W-L-R),Y=y=>T+(1-(y-lo)/(hi-lo))*(H-T-B);
+ const dec=hi-lo<3?2:hi-lo<15?1:0;
+ let g='';
+ if(o.band)g+=`<rect class="band" x="${L}" width="${W-L-R}" y="${Y(o.band[1]).toFixed(1)}" height="${(Y(o.band[0])-Y(o.band[1])).toFixed(1)}"/>`;
+ for(let i=0;i<=4;i++){const y=lo+(hi-lo)*i/4,py=Y(y).toFixed(1);g+=`<line class="gl" x1="${L}" x2="${W-R}" y1="${py}" y2="${py}"/><text x="${L-6}" y="${+py+4}" text-anchor="end">${fmt(y,dec)}</text>`}
+ for(let w=0;w*7<n;w+=2)g+=`<text x="${X(w*7).toFixed(1)}" y="${H-5}">W${w+1}</text>`;
+ if(o.goal!=null)g+=`<line class="goal" x1="${L}" x2="${W-R}" y1="${Y(o.goal).toFixed(1)}" y2="${Y(o.goal).toFixed(1)}"/>`;
+ series.forEach(s=>{if(!s.pts.length)return;const sp=[...s.pts].sort((a,b)=>a[0]-b[0]);
+  g+=`<path class="${s.cls}" d="M${sp.map(p=>X(p[0]).toFixed(1)+','+Y(p[1]).toFixed(1)).join('L')}"/>`;
+  g+=sp.map(p=>`<circle class="${s.cls}d" r="2.6" cx="${X(p[0]).toFixed(1)}" cy="${Y(p[1]).toFixed(1)}"/>`).join('')});
+ return `<figure class="chart">${cap}<svg viewBox="0 0 ${W} ${H}" role="img" aria-label="${title}">${g}</svg>${o.note?`<p class="sub">${o.note}</p>`:''}</figure>`;
+}
+function chartSet(){
+ return [
+  chart('Gewicht',[{pts:ser('w'),cls:'s1'}],{unit:'kg'}),
+  chart('Blutzucker nüchtern',[{pts:ser('g'),cls:'s1'}],{unit:'mg/dl'}),
+  chart('Ketone',[{pts:ser('k'),cls:'s3'}],{unit:'mmol/l',band:[0.5,3],note:'Grüne Fläche: 0,5–3,0 mmol/l, der übliche Bereich einer ernährungsbedingten Ketose.'}),
+  chart('Blutdruck',[{pts:ser('sys'),cls:'s1'},{pts:ser('dia'),cls:'s2'}],{unit:'mmHg',note:'<span class="key" style="background:var(--ink)"></span>systolisch<span class="key" style="background:var(--s2)"></span>diastolisch'}),
+  chart('Kohlenhydrate',[{pts:ser('c'),cls:'s2'}],{unit:'g/Tag',goal:S.settings.carbGoal,note:'Gestrichelt: dein Limit.'}),
+  chart('Ruhepuls (Garmin, Wochenmittel)',[{pts:wser('rhr'),cls:'s1'}],{unit:'/min'}),
+  chart('Bauchumfang',[{pts:wser('waist'),cls:'s1'}],{unit:'cm'})
+ ];
+}
+function renderTrend(){$('#v-trend').innerHTML=`<div class="panel">${chartSet().join('')}</div>`}
+
+/* ---------- print ---------- */
+function doPrint(html,landscape){
+ $('#pagestyle').textContent=`@page{size:A4 ${landscape?'landscape':'portrait'};margin:${landscape?'10mm':'12mm'}}`;
+ $('#print').innerHTML=html;
+ setTimeout(()=>window.print(),60);
+}
+window.addEventListener('afterprint',()=>{$('#print').innerHTML=''});
+
+function sheetHTML(wn,fill){
+ const [a,b]=weekRange(wn),days=Array.from({length:7},(_,i)=>addDays(a,i));
+ const D=ds=>fill?(S.days[ds]||{}):{};
+ const cell=(ds,f)=>{const v=D(ds)[f];return v==null?'':fmt(v,2)};
+ const rows=[
+  ['Gewicht','kg, morgens',ds=>cell(ds,'w')],
+  ['Blutzucker','mg/dl, nüchtern',ds=>cell(ds,'g')],
+  ['Ketone','mmol/l, nüchtern',ds=>cell(ds,'k')],
+  ['Blutdruck','sys / dia',ds=>{const d=D(ds);return d.sys!=null?`${d.sys}/${d.dia??''}`:'<span class="opts">/</span>'}],
+  ['Kohlenhydrate',`g, Limit ${S.settings.carbGoal} g`,ds=>cell(ds,'c')],
+  ['Energie','1 schlapp, 5 topfit',ds=>D(ds).en?`<b>${D(ds).en}</b>`:'<span class="opts">1 2 3 4 5</span>'],
+  ['Hunger','1 kaum, 5 stark',ds=>D(ds).hu?`<b>${D(ds).hu}</b>`:'<span class="opts">1 2 3 4 5</span>'],
+  ['Im Plan?','ja, teils, nein',ds=>{const p=D(ds).plan;return p?`<b>${{y:'✓',t:'~',n:'✗'}[p]}</b>`:'<span class="opts">✓ ~ ✗</span>'}]
+ ];
+ const w=fill?(S.weeks[wn]||{}):{};
+ const wv=(f,u)=>w[f]!=null?`<b>${fmt(w[f],1)} ${u}</b>`:'';
+ return `<div class="sheet"><div class="sh"><h2>Keto-Protokoll, Woche ${wn}</h2><span>${fd(a,{day:'numeric',month:'long'})} bis ${fd(b,{day:'numeric',month:'long',year:'numeric'})}${S.settings.name?', '+esc(S.settings.name):''}</span></div>
+ <table><thead><tr><th style="width:40mm"></th>${days.map(ds=>`<th>${fd(ds,{weekday:'short'})}<br><small>${fd(ds)}</small></th>`).join('')}</tr></thead><tbody>
+ ${rows.map(([l,s,fn])=>`<tr><th>${l}<small>${s}</small></th>${days.map(ds=>`<td>${fn(ds)}</td>`).join('')}</tr>`).join('')}
+ <tr class="tall"><th>Beschwerden, Notizen<small>Kopfweh, Krämpfe, Schlaf …</small></th>${days.map(ds=>{const d=D(ds);return `<td style="font-size:7.5pt;text-align:left;vertical-align:top">${esc([...(d.sym||[]),d.note||''].filter(Boolean).join(', '))}</td>`}).join('')}</tr>
+ </tbody></table>
+ <div class="wk"><div>Bauchumfang (cm)${wv('waist','')}</div><div>Ruhepuls Ø (Garmin)${wv('rhr','')}</div><div>Schlaf Ø (h)${wv('sleep','')}</div><div>Stress Ø (Garmin)${wv('stress','')}</div><div>Schritte Ø pro Tag${wv('steps','')}</div><div>Wochennotiz<br>${esc(w.note||'')}</div></div>
+ <p class="foot">Morgens messen, nach dem Aufstehen, vor Frühstück und Kaffee. Blutdruck sitzend nach 5 Minuten Ruhe. Einmal pro Woche ins Protokoll übertragen.</p></div>`;
+}
+
+function reportHTML(){
+ const st=S.settings,end=addDays(st.start,N()-1);
+ const inR=Object.entries(S.days).filter(([ds,d])=>{const i=diffDays(st.start,ds);return i>=0&&i<N()&&Object.keys(d).length});
+ const firstLast=f=>{let fi=null,la=null;for(let w=1;w<=nWeeks();w++){const [a,b]=weekRange(w);const v=avg(a,b,f);if(v!=null){if(!fi)fi=[w,v];la=[w,v]}}return [fi,la]};
+ const wfl=f=>{const ws=Object.keys(S.weeks).map(Number).filter(n=>S.weeks[n][f]!=null).sort((a,b)=>a-b);return ws.length?[[ws[0],S.weeks[ws[0]][f]],[ws.at(-1),S.weeks[ws.at(-1)][f]]]:[null,null]};
+ const row=(l,u,d,[fi,la])=>`<tr><td>${l}</td><td>${u}</td><td class="num">${fi?fmt(fi[1],d)+` <span class="small">(W${fi[0]})</span>`:'–'}</td><td class="num">${la&&la[0]!==fi[0]?fmt(la[1],d)+` <span class="small">(W${la[0]})</span>`:'–'}</td><td class="num">${fi&&la&&la[0]!==fi[0]?((la[1]-fi[1])>0?'+':(la[1]-fi[1])<0?'−':'±')+fmt(Math.abs(la[1]-fi[1]),d):''}</td></tr>`;
+ const DR=[['Gewicht','w','kg',1],['Blutzucker nüchtern','g','mg/dl',0],['Ketone','k','mmol/l',2],['Blutdruck systolisch','sys','mmHg',0],['Blutdruck diastolisch','dia','mmHg',0],['Puls','p','/min',0],['Kohlenhydrate','c','g/Tag',0],['Energie (1–5)','en','',1],['Hunger (1–5)','hu','',1]];
+ const WR=[['Bauchumfang','waist','cm',1],['Ruhepuls (Garmin)','rhr','/min',0],['Schlaf (Garmin)','sleep','h',1],['Stress (Garmin)','stress','0–100',0],['Schritte (Garmin)','steps','/Tag',0]];
+ const days=inR.map(e=>e[1]);
+ const pl=days.filter(d=>d.plan),py=pl.filter(d=>d.plan==='y').length,pt=pl.filter(d=>d.plan==='t').length;
+ const kd=days.filter(d=>d.k!=null),kin=kd.filter(d=>d.k>=0.5).length;
+ const cd=days.filter(d=>d.c!=null),cOver=cd.filter(d=>d.c>st.carbGoal).length;
+ const months=Math.ceil(N()/30);
+ const symC=SYMS.map(s=>{const c=Array(months).fill(0);inR.forEach(([ds,d])=>{if((d.sym||[]).includes(s))c[Math.floor(diffDays(st.start,ds)/30)]++});return [s,c]}).filter(([,c])=>c.some(Boolean));
+ const labs=S.labs.filter(r=>r.base||r.end);
+ const wn=Object.keys(S.weeks).map(Number).sort((a,b)=>a-b).filter(n=>S.weeks[n].note);
+ const dn=inR.filter(([,d])=>d.note).sort((a,b)=>a[0]<b[0]?-1:1);
+ const charts=chartSet().filter((_,i)=>i!==4&&i!==6);
+ return `<div class="report">
+ <h1>Keto-Protokoll: Zusammenfassung</h1>
+ <p>${st.name?esc(st.name)+', ':''}Zeitraum ${fd(st.start,{day:'numeric',month:'long',year:'numeric'})} bis ${fd(end,{day:'numeric',month:'long',year:'numeric'})}. Einträge an ${inR.length} von ${N()} Tagen. Kohlenhydrat-Limit ${st.carbGoal} g/Tag.</p>
+ <h2>Verlauf im Überblick</h2>
+ <p class="small">Mittelwerte der ersten und der letzten Woche mit Messwerten.</p>
+ <table><thead><tr><th>Parameter</th><th>Einheit</th><th class="num">Anfang</th><th class="num">Ende</th><th class="num">Veränderung</th></tr></thead><tbody>
+ ${DR.map(([l,f,u,d])=>row(l,u,d,firstLast(f))).join('')}${WR.map(([l,f,u,d])=>row(l,u,d,wfl(f))).join('')}</tbody></table>
+ <h2>Umsetzung</h2>
+ <p>Im Plan geblieben: ${pl.length?`${py} Tage voll, ${pt} teilweise, ${pl.length-py-pt} nicht (von ${pl.length} Tagen mit Angabe)`:'keine Angaben'}.</p>
+ <p>Ketonmessungen: ${kd.length?`${kin} von ${kd.length} bei 0,5 mmol/l oder höher, Mittelwert ${fmt(kd.reduce((s,d)=>s+d.k,0)/kd.length,2)} mmol/l`:'keine'}.</p>
+ <p>Kohlenhydrate: ${cd.length?`Ø ${fmt(cd.reduce((s,d)=>s+d.c,0)/cd.length,0)} g/Tag, an ${cOver} von ${cd.length} Tagen über dem Limit`:'keine Angaben'}.</p>
+ <h2>Kurven</h2><div class="cg">${charts.join('')}</div>
+ <h2>Laborwerte</h2>
+ ${labs.length?`<table><thead><tr><th>Parameter</th><th>Einheit</th><th class="num">Ausgang${S.labDates.base?'<br><span class="small">'+fd(S.labDates.base,{day:'2-digit',month:'2-digit',year:'numeric'})+'</span>':''}</th><th class="num">Abschluss${S.labDates.end?'<br><span class="small">'+fd(S.labDates.end,{day:'2-digit',month:'2-digit',year:'numeric'})+'</span>':''}</th><th class="num">Veränderung</th></tr></thead><tbody>${labs.map(r=>`<tr><td>${esc(r.name)}</td><td>${esc(r.unit)}</td><td class="num">${esc(r.base)||'–'}</td><td class="num">${esc(r.end)||'–'}</td><td class="num">${delta(r.base,r.end,2).replace(/<[^>]+>/g,'')}</td></tr>`).join('')}</tbody></table>`:'<p>Keine Laborwerte eingetragen.</p>'}
+ <h2>Beschwerden</h2>
+ ${symC.length?`<table><thead><tr><th>Beschwerde</th>${Array.from({length:months},(_,i)=>`<th class="num">Tage ${i*30+1}–${Math.min((i+1)*30,N())}</th>`).join('')}</tr></thead><tbody>${symC.map(([s,c])=>`<tr><td>${s}</td>${c.map(x=>`<td class="num">${x||''}</td>`).join('')}</tr>`).join('')}</tbody></table>`:'<p>Keine Beschwerden notiert.</p>'}
+ ${wn.length||dn.length?`<h2>Notizen</h2>${wn.map(n=>`<p><b>Woche ${n}:</b> ${esc(S.weeks[n].note)}</p>`).join('')}${dn.length?`<p class="small" style="margin-top:2mm">${dn.map(([ds,d])=>`<b>${fd(ds)}</b> ${esc(d.note)}`).join(' &nbsp; ')}</p>`:''}`:''}
+ <h2>Fragen für die Besprechung</h2><div class="qs">${esc(st.questions)}</div>
+ </div>`;
+}
+
+function renderPrint(){
+ const def=Math.min(nWeeks(),Math.max(1,weekOf(today())));
+ $('#v-print').innerHTML=`<div class="panel"><h2>Kühlschrank-Blatt</h2><p class="sub">Eine Woche auf A4 quer. Leer drucken zum Ausfüllen, oder mit den schon erfassten Werten.</p>
+ <div class="row"><label for="pw"><b>Woche</b></label><select id="pw">${Array.from({length:nWeeks()},(_,i)=>{const [a]=weekRange(i+1);return `<option value="${i+1}" ${i+1===def?'selected':''}>Woche ${i+1} (ab ${fd(a)})</option>`}).join('')}</select></div>
+ <div class="row"><label for="pfill"><b>Erfasste Werte eintragen</b><small>aus: leeres Blatt</small></label><input id="pfill" type="checkbox" style="width:22px;height:22px;justify-self:end"></div>
+ <div class="btns"><button type="button" class="btn primary" id="doSheet">Blatt drucken</button></div></div>
+ <div class="panel"><h2>Bericht für die Abschlussbesprechung</h2><p class="sub">Überblick, Kurven, Laborwerte vorher und nachher, Beschwerden und Notizen. Im Druckdialog kannst du auch als PDF speichern.</p>
+ <div class="row wide"><label for="pq"><b>Fragen an den Arzt</b><small>sammle sie über die drei Monate hier, sie erscheinen am Ende des Berichts</small></label><textarea id="pq" rows="4">${esc(S.settings.questions)}</textarea></div>
+ <div class="btns"><button type="button" class="btn primary" id="doReport">Bericht drucken</button></div></div>`;
+}
+$('#v-print').addEventListener('change',e=>{if(e.target.id==='pq'){S.settings.questions=e.target.value;save()}});
+$('#v-print').addEventListener('click',e=>{
+ if(e.target.id==='doSheet')doPrint(sheetHTML(+$('#pw').value,$('#pfill').checked),true);
+ if(e.target.id==='doReport'){S.settings.questions=$('#pq').value;save();doPrint(reportHTML(),false)}
+});
+
+/* ---------- settings ---------- */
+function download(name,text,type){const a=document.createElement('a');a.href=URL.createObjectURL(new Blob([text],{type}));a.download=name;document.body.appendChild(a);a.click();setTimeout(()=>{URL.revokeObjectURL(a.href);a.remove()},800)}
+function renderSet(){
+ const st=S.settings;
+ $('#v-set').innerHTML=`<div class="panel"><h2>Zeitraum</h2>
+ <div class="row"><label for="s_name"><b>Name</b><small>erscheint auf Blatt und Bericht</small></label><input id="s_name" data-s="name" value="${esc(st.name)}"></div>
+ <div class="row"><label for="s_start"><b>Start</b></label><input id="s_start" type="date" data-s="start" value="${st.start}"></div>
+ <div class="row"><label for="s_days"><b>Dauer</b><small>in Tagen</small></label><div class="inp"><input id="s_days" data-s="days" inputmode="numeric" value="${st.days}"><span class="unit">Tage</span></div></div>
+ <div class="row"><label for="s_carb"><b>Kohlenhydrat-Limit</b><small>wie mit dem Arzt abgesprochen</small></label><div class="inp"><input id="s_carb" data-s="carbGoal" inputmode="numeric" value="${st.carbGoal}"><span class="unit">g/Tag</span></div></div></div>
+ <div class="panel"><h2>Backup</h2><p class="sub">Die Daten liegen nur in diesem Browser. Sichere sie regelmäßig, und übertrage sie so auch zwischen Handy und Rechner.${st.lastBackup?` Letztes Backup: ${fd(st.lastBackup,{day:'numeric',month:'long'})}.`:''}</p>
+ <div class="btns"><button type="button" class="btn primary" id="exp">Backup speichern</button><button type="button" class="btn" id="imp">Backup laden</button><button type="button" class="btn" id="csv">Tageswerte als CSV</button></div></div>
+ <div class="panel"><h2>Alles löschen</h2><p class="sub">Entfernt alle Einträge aus diesem Browser.</p><div class="btns"><button type="button" class="btn danger" id="reset">Alle Daten löschen</button></div></div>`;
+}
+$('#v-set').addEventListener('change',e=>{
+ const t=e.target,k=t.dataset.s;if(!k)return;
+ if(k==='days'||k==='carbGoal'){const n=num(t.value);if(n==null||n<=0){status('Bitte eine Zahl eingeben');return}S.settings[k]=Math.round(n)}
+ else if(k==='start'){if(!t.value)return;S.settings.start=t.value}
+ else S.settings[k]=t.value.trim();
+ save();curWeek=Math.min(nWeeks(),Math.max(1,weekOf(today())));renderHead();
+});
+$('#v-set').addEventListener('click',e=>{
+ const id=e.target.id;
+ if(id==='exp'){S.settings.lastBackup=today();save('Backup erstellt');download(`keto-protokoll-backup-${today()}.json`,JSON.stringify(S,null,1),'application/json');renderSet();renderHead()}
+ if(id==='imp')$('#importFile').click();
+ if(id==='csv'){const f=['w','g','k','sys','dia','p','c','en','hu','plan'];const hd=['Datum','Tag','Gewicht_kg','Blutzucker_mgdl','Ketone_mmolL','RR_sys','RR_dia','Puls','KH_g','Energie','Hunger','Im_Plan','Beschwerden','Notiz'];
+  const rows=Object.keys(S.days).sort().map(ds=>{const d=S.days[ds];return [ds,diffDays(S.settings.start,ds)+1,...f.map(k=>d[k]==null?'':String(d[k]).replace('.',',')),(d.sym||[]).join(', '),(d.note||'').replace(/[\r\n;]+/g,' ')].map(x=>`"${String(x).replace(/"/g,'""')}"`).join(';')});
+  download(`keto-protokoll-${today()}.csv`,'\ufeff'+[hd.join(';'),...rows].join('\r\n'),'text/csv')}
+ if(id==='reset'&&confirm('Wirklich alle Daten löschen? Das lässt sich nicht rückgängig machen.')){localStorage.removeItem(KEY);load();curDate=today();renderAll();status('Gelöscht')}
+});
+$('#importFile').addEventListener('change',e=>{
+ const file=e.target.files[0];if(!file)return;const r=new FileReader();
+ r.onload=()=>{try{const d=JSON.parse(r.result);if(!d.settings||!d.days)throw 0;if(!confirm('Backup laden? Die aktuellen Daten in diesem Browser werden ersetzt.'))return;S=d;S.weeks=S.weeks||{};S.labs=S.labs||[];S.labDates=S.labDates||{};save('Backup geladen');renderAll()}catch(err){status('Datei ist kein gültiges Backup')}e.target.value=''};
+ r.readAsText(file);
+});
+
+/* ---------- tabs ---------- */
+const R={day:renderDay,week:renderWeek,lab:renderLab,trend:renderTrend,print:renderPrint,set:renderSet};
+function show(tab){curTab=tab;document.querySelectorAll('nav button').forEach(b=>b.setAttribute('aria-selected',b.dataset.tab===tab));Object.keys(R).forEach(k=>$('#v-'+k).hidden=k!==tab);R[tab]();renderHead()}
+document.querySelector('nav').addEventListener('click',e=>{const b=e.target.closest('[data-tab]');if(b)show(b.dataset.tab)});
+$('#strip').addEventListener('click',e=>{const b=e.target.closest('[data-date]');if(!b)return;curDate=b.dataset.date;show('day')});
+$('#nudge').addEventListener('click',e=>{if(e.target.dataset.goto)show(e.target.dataset.goto)});
+function renderAll(){curWeek=Math.min(nWeeks(),Math.max(1,weekOf(today())));show(curTab)}
+
+load();renderAll();
+</script>
+</body>
+</html>
