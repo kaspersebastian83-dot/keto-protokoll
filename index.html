@@ -91,52 +91,74 @@ td.num,th.num{text-align:right}
 
 /* ---------- print ---------- */
 @media print{
- :root,:root:not([data-theme="light"]),:root[data-theme="dark"]{--paper:#fff;--grid:#fff;--ink:#1D3A6B;--text:#000;--muted:#555;--line:#bbb;--field:#fff;--keto:#0F7F73;--ketoBand:rgba(15,127,115,.13);--s2:#B4541F;--warn:#B42318}
+ :root,:root:not([data-theme="light"]),:root[data-theme="dark"]{--paper:#fff;--grid:#fff;--ink:#1D3A6B;--text:#000;--muted:#555;--line:#bbb;--field:#fff;--keto:#0F7F73;--ketoBand:rgba(15,127,115,.13);--s2:#B4541F;--warn:#B42318;--hair:#e5e9ef;--inkwash:#1D3A6B0D}
  :root{padding:0}
  body{background:#fff;color:#000;font-size:10.5pt}
  body>*:not(#print){display:none!important}
  #print{display:block}
 }
-.sheet h2{font-family:"IBM Plex Serif",Georgia,serif;font-size:17pt;font-weight:600;margin:0;color:#fff}
-.sheet .sh{background:#1D3A6B;color:#fff;display:flex;justify-content:space-between;align-items:flex-end;padding:3mm 4mm;margin:0 0 3mm;border-radius:1mm}
-.sheet .sh-app{display:block;font-size:7.5pt;letter-spacing:.6mm;text-transform:uppercase;color:rgba(255,255,255,.72);margin:0 0 .8mm}
-.sheet .sh-date{font-size:8.5pt;font-weight:400;color:rgba(255,255,255,.88)}
+/* ===== fridge sheet ===== */
 .sheet table{table-layout:fixed;width:100%;border-collapse:collapse}
-.sheet th,.sheet td{border-right:.6pt solid #666;padding:1mm 2mm;color:#000}
-.sheet th:last-child,.sheet td:last-child{border-right:0}
-.sheet tbody tr td,.sheet tbody tr th{border-bottom:.25pt solid #ccc}
-.sheet tbody tr:last-child td,.sheet tbody tr:last-child th{border-bottom:.6pt solid #666}
-.sheet thead th{border-bottom:.6pt solid #666;text-align:center;font-weight:600;font-size:10pt;height:9mm}
-.sheet tbody th{width:40mm;text-align:left;font-weight:600;font-size:10pt}
-.sheet th small{display:block;font-weight:400;color:#555;font-size:7.5pt}
-.sheet tbody td{text-align:center;font-size:12pt}
-.sheet tbody.blk-daily td,.sheet tbody.blk-daily th{background:var(--ketoBand);height:13mm}
-.sheet tbody.blk-befinden td,.sheet tbody.blk-befinden th{height:9mm}
-.sheet .opts{color:#999;font-size:9pt;letter-spacing:1.6mm}
-.sheet tr.tall td{height:17mm}
-.sheet .wk-wrap{border-top:.8pt solid #1D3A6B;margin-top:4mm;padding-top:2mm}
-.sheet .wk-label{font-family:"IBM Plex Serif",Georgia,serif;font-size:9pt;font-weight:600;color:#1D3A6B;margin:0 0 1.5mm}
-.sheet .wk{display:grid;grid-template-columns:repeat(5,1fr) 2.2fr;gap:2.5mm}
-.sheet .wk div{border:.6pt solid #666;padding:1.2mm 2mm;min-height:15mm;font-size:8.5pt;color:#333}
-.sheet .wk b{display:block;font-size:11pt;color:#000;margin-top:1mm}
-.sheet .foot{font-size:7.5pt;color:#555;margin-top:2mm}
-.report-title{padding-bottom:2mm;margin-bottom:4mm;border-bottom:.8pt solid #1D3A6B}
-.report-title .overline{font-size:7.5pt;letter-spacing:.6mm;text-transform:uppercase;color:#1D3A6B;margin:0 0 1mm}
-.report-title .subtitle{font-size:9pt;color:#444;margin:0}
-.report h1{font-family:"IBM Plex Serif",Georgia,serif;font-size:22pt;font-weight:600;color:#1D3A6B;margin:0 0 1.5mm}
-.report h2{font-family:"IBM Plex Serif",Georgia,serif;font-size:12pt;font-weight:600;color:#1D3A6B;border-bottom:.8pt solid #1D3A6B;padding-bottom:.8mm;margin:5mm 0 1.5mm;break-after:avoid}
+.sheet th,.sheet td{padding:.6mm 2mm;color:#000}
+.sheet .band{background:var(--ink);color:#fff;padding:3mm 0;margin:0 0 3.5mm;display:flex;justify-content:space-between;align-items:center}
+.sheet .band .l{display:flex;align-items:baseline}
+.sheet .band .r{color:#c3cfe4;font-size:9.2pt}
+.sheet .band .wk-title{font-family:"IBM Plex Serif",Georgia,serif;font-weight:600;font-size:19pt;color:#fff;display:inline;border:0;padding:0;margin:0}
+.sheet .band .range{font-size:10pt;color:#c3cfe4;margin-left:3mm}
+.sheet .daycell{text-align:center;padding:1.2mm 0 .8mm;border:.5pt solid var(--line)}
+.sheet .daynum{font-family:"IBM Plex Serif",Georgia,serif;font-weight:600;font-size:19pt;color:var(--ink);display:block;line-height:1}
+.sheet .dayname{font-size:8.4pt;color:var(--muted)}
+.sheet .rowlabel{width:40mm;text-align:left;font-weight:600;font-size:9.4pt;line-height:1.15;border:.5pt solid var(--line)}
+.sheet .rowlabel small{display:block;font-weight:400;color:#555;font-size:7.6pt;line-height:1.15}
+.sheet td.cell{border:.5pt solid var(--line);height:10mm;font-size:11pt;line-height:1.1;text-align:center}
+.sheet tbody.zone-vitals{background:var(--inkwash)}
+.sheet tbody.zone-vitals td.cell{height:11mm}
+.sheet tbody.zone-lifestyle td.cell{height:8mm;font-size:10.3pt}
+.sheet .ok{color:var(--keto);font-weight:600}
+.sheet .empty{color:var(--line)}
+.sheet .ruled{background-image:repeating-linear-gradient(#fff 0 7.4mm,var(--hair) 7.4mm 7.6mm);background-position:0 4mm}
+.sheet tr.tall td.cell{height:15mm}
+.sheet .wk-wrap{border-top:.8pt solid var(--ink);margin-top:2.5mm;padding-top:1.2mm}
+.sheet .wk-label{font-family:"IBM Plex Serif",Georgia,serif;font-size:9pt;font-weight:600;color:var(--ink);margin:0 0 1mm}
+.sheet .wk{display:grid;grid-template-columns:repeat(5,1fr) 2.2fr;gap:2mm}
+.sheet .wk div{border:.6pt solid #666;padding:.8mm 2mm;min-height:9mm;font-size:8.5pt;color:#333;line-height:1.2}
+.sheet .wk b{display:block;font-size:11pt;color:#000;margin-top:.5mm}
+.sheet .foot{font-size:7.5pt;color:#555;margin-top:1.2mm}
+
+/* ===== doctor report ===== */
+.report-title{margin-bottom:0}
+.report-title .tag{display:inline-block;font-size:8.3pt;color:var(--keto);font-weight:500;background:var(--ketoBand);padding:1.6mm 3mm;border-radius:2px;margin-bottom:4mm}
+.report h1{font-family:"IBM Plex Serif",Georgia,serif;font-weight:600;font-size:27pt;color:var(--ink);letter-spacing:-.01em;line-height:1.05;margin:0}
+.report-title .subtitle{font-size:10.3pt;color:var(--muted);margin-top:2mm}
+.report-title .rule{height:1pt;background:var(--ink);margin:5mm 0 6mm}
+.report .stats{width:100%;border-collapse:collapse;margin-bottom:9mm}
+.report .stats td{width:33.33%;padding:0 6mm 0 0;vertical-align:top;border-right:.6pt solid var(--line)}
+.report .stats td:last-child{border-right:0;padding-right:0}
+.report .stats td:not(:first-child){padding-left:6mm}
+.report .stat-n{font-family:"IBM Plex Serif",Georgia,serif;font-weight:600;font-size:19pt;display:block}
+.report .stat-l{font-size:8.4pt;color:var(--muted);margin-top:.8mm}
+.report .stat-n.down{color:var(--keto)}.report .stat-n.up{color:var(--s2)}.report .stat-n.flat{color:var(--ink)}
+.report h2{font-family:"IBM Plex Serif",Georgia,serif;font-weight:500;font-size:13.5pt;color:var(--ink);margin:9mm 0 3mm;padding-left:3mm;border-left:2.6pt solid var(--ink);break-after:avoid;break-inside:avoid}
+.report h2:first-of-type{margin-top:0}
+.report h2+*{break-inside:avoid}
 .report table{font-size:9.5pt}
-.report th,.report td{padding:1.2mm 2mm;border-bottom:.3pt solid #ddd;color:#000}
-.report thead th{border-bottom:.8pt solid #1D3A6B}
+.report table.data td{padding:1.9mm 2.5mm;border-bottom:.4pt solid var(--hair)}
+.report table.data th{border-bottom:1pt solid var(--ink)}
+.report table.data tr:nth-child(even) td{background:var(--inkwash)}
+.report table.data td.num,.report table.data th.num{font-variant-numeric:tabular-nums}
 .report .cg{display:grid;grid-template-columns:1fr 1fr;gap:5mm 6mm;align-items:start}
 .report .chart{break-inside:avoid;margin:0}
-.report .chart figcaption{margin-bottom:1mm;line-height:1.2}
+.report .chart figcaption{margin-bottom:1mm;line-height:1.2;font-size:8.6pt;font-weight:500;color:var(--ink)}
 .report .chart .sub{margin:.5mm 0 0;font-size:7.5pt;line-height:1.2}
 .report .chart text{font-size:13px}
 .report p{margin:1mm 0}
 .report ul{margin:1mm 0;padding-left:4mm}
 .report li{margin:.5mm 0}
 .report .small{font-size:8.5pt;color:#444}
+.report .callout{background:var(--ketoBand);border-left:2.6pt solid var(--keto);padding:4mm 5mm;margin-top:2mm}
+.report .callout p.note{font-size:8.3pt;color:var(--muted);margin-bottom:2.4mm;margin-top:0;font-style:italic}
+.report .callout ul{padding-left:4mm;margin-top:0}
+.report .callout li{margin:1.6mm 0}
 .report .qs{white-space:pre-wrap;border:.6pt solid #999;padding:2mm 3mm;min-height:30mm}
 </style>
 </head>
@@ -483,25 +505,25 @@ function sheetHTML(wn,fill){
   ['Gewicht','kg, morgens',ds=>cell(ds,'w')],
   ['Blutzucker','mg/dl, nüchtern',ds=>cell(ds,'g')],
   ['Ketone','mmol/l, nüchtern',ds=>cell(ds,'k')],
-  ['Blutdruck','sys / dia',ds=>{const d=D(ds);return d.sys!=null?`${d.sys}/${d.dia??''}`:'<span class="opts">/</span>'}],
-  ...S.settings.meds.map(m=>[esc(m.name),esc(m.dose),ds=>{const v=(D(ds).meds||{})[m.id];return v===true?'<b>✓</b>':v===false?'<b>✗</b>':'<span class="opts">□</span>'}]),
+  ['Blutdruck','sys / dia',ds=>{const d=D(ds);return d.sys!=null?`${d.sys}/${d.dia??''}`:'<span class="empty">/</span>'}],
+  ...S.settings.meds.map(m=>[esc(m.name),esc(m.dose),ds=>{const v=(D(ds).meds||{})[m.id];return v===true?'<b class="ok">✓</b>':v===false?'<b>✗</b>':'<span class="empty">□</span>'}]),
   ['Kohlenhydrate',`g, Limit ${S.settings.carbGoal} g`,ds=>cell(ds,'c')]
  ];
  const befindenRows=[
-  ['Energie','1 schlapp, 5 topfit',ds=>D(ds).en?`<b>${D(ds).en}</b>`:'<span class="opts">1 2 3 4 5</span>'],
-  ['Hunger','1 kaum, 5 stark',ds=>D(ds).hu?`<b>${D(ds).hu}</b>`:'<span class="opts">1 2 3 4 5</span>'],
-  ['Im Plan?','ja, teils, nein',ds=>{const p=D(ds).plan;return p?`<b>${{y:'✓',t:'~',n:'✗'}[p]}</b>`:'<span class="opts">✓ ~ ✗</span>'}]
+  ['Energie','1 schlapp, 5 topfit',ds=>D(ds).en?`<b>${D(ds).en}</b>`:'<span class="empty">1 2 3 4 5</span>'],
+  ['Hunger','1 kaum, 5 stark',ds=>D(ds).hu?`<b>${D(ds).hu}</b>`:'<span class="empty">1 2 3 4 5</span>'],
+  ['Im Plan?','ja, teils, nein',ds=>{const p=D(ds).plan;if(!p)return '<span class="empty">✓ ~ ✗</span>';return p==='y'?'<b class="ok">✓</b>':`<b>${{t:'~',n:'✗'}[p]}</b>`}]
  ];
- const rowHTML=([l,s,fn])=>`<tr><th>${l}<small>${s}</small></th>${days.map(ds=>`<td>${fn(ds)}</td>`).join('')}</tr>`;
+ const rowHTML=([l,s,fn])=>`<tr><th class="rowlabel">${l}<small>${s}</small></th>${days.map(ds=>`<td class="cell">${fn(ds)}</td>`).join('')}</tr>`;
  const w=fill?(S.weeks[wn]||{}):{};
  const wv=(f,u)=>w[f]!=null?`<b>${fmt(w[f],1)} ${u}</b>`:'';
- return `<div class="sheet"><div class="sh"><div><span class="sh-app">Keto-Protokoll</span><h2>Woche ${wn}</h2></div><span class="sh-date">${fd(a,{day:'numeric',month:'long'})} bis ${fd(b,{day:'numeric',month:'long',year:'numeric'})}${S.settings.name?', '+esc(S.settings.name):''}</span></div>
- <table><thead><tr><th style="width:40mm"></th>${days.map(ds=>`<th>${fd(ds,{weekday:'short'})}<br><small>${fd(ds)}</small></th>`).join('')}</tr></thead>
- <tbody class="blk-daily">${dailyRows.map(rowHTML).join('')}</tbody>
- <tbody class="blk-befinden">${befindenRows.map(rowHTML).join('')}
- <tr class="tall"><th>Beschwerden, Notizen<small>Kopfweh, Krämpfe, Schlaf …</small></th>${days.map(ds=>{const d=D(ds);return `<td style="font-size:7.5pt;text-align:left;vertical-align:top">${esc([...(d.sym||[]),d.note||''].filter(Boolean).join(', '))}</td>`}).join('')}</tr>
+ return `<div class="sheet"><div class="band"><div class="l"><h2 class="wk-title">Woche ${wn}</h2><span class="range">${fd(a,{day:'numeric',month:'long'})} – ${fd(b,{day:'numeric',month:'long',year:'numeric'})}</span></div><div class="r">Keto-Protokoll</div></div>
+ <table><thead><tr><th style="width:40mm"></th>${days.map(ds=>`<th class="daycell"><span class="daynum">${fd(ds,{day:'numeric'})}</span><span class="dayname">${fd(ds,{weekday:'short'})}</span></th>`).join('')}</tr></thead>
+ <tbody class="zone-vitals">${dailyRows.map(rowHTML).join('')}</tbody>
+ <tbody class="zone-lifestyle">${befindenRows.map(rowHTML).join('')}
+ <tr class="tall"><th class="rowlabel">Beschwerden, Notizen<small>Kopfweh, Krämpfe, Schlaf …</small></th>${days.map(ds=>{const d=D(ds);return `<td class="cell ruled" style="font-size:7.5pt;text-align:left;vertical-align:top">${esc([...(d.sym||[]),d.note||''].filter(Boolean).join(', '))}</td>`}).join('')}</tr>
  </tbody></table>
- <div class="wk-wrap"><div class="wk-label">Einmal pro Woche</div><div class="wk"><div>Bauchumfang (cm)${wv('waist','')}</div><div>Ruhepuls Ø (Garmin)${wv('rhr','')}</div><div>Schlaf Ø (h)${wv('sleep','')}</div><div>Stress Ø (Garmin)${wv('stress','')}</div><div>Schritte Ø pro Tag${wv('steps','')}</div><div>Wochennotiz<br>${esc(w.note||'')}</div></div></div>
+ <div class="wk-wrap"><div class="wk-label">Einmal pro Woche</div><div class="wk"><div>Bauchumfang (cm)${wv('waist','')}</div><div>Ruhepuls Ø, Garmin${wv('rhr','')}</div><div>Schlaf Ø (h)${wv('sleep','')}</div><div>Stress Ø, Garmin${wv('stress','')}</div><div>Schritte Ø pro Tag${wv('steps','')}</div><div class="ruled">Wochennotiz<br>${esc(w.note||'')}</div></div></div>
  <p class="foot">Morgens messen, nach dem Aufstehen, vor Frühstück und Kaffee. Blutdruck sitzend nach 5 Minuten Ruhe. Einmal pro Woche ins Protokoll übertragen. · Keto-Protokoll v${VERSION}</p></div>`;
 }
 
@@ -593,11 +615,22 @@ function reportHTML(){
  const dn=inR.filter(([,d])=>d.note).sort((a,b)=>a[0]<b[0]?-1:1);
  const charts=chartSet().filter((_,i)=>i!==4&&i!==6);
  const talkingPoints=generateTalkingPoints();
+ const monthsApprox=Math.max(1,Math.round(N()/30));
+ let wStat;
+ const [wfi,wla]=firstLast('w');
+ if(wfi&&wla){
+  const d=wla[1]-wfi[1],cls=d>0?'up':d<0?'down':'flat',sign=d>0?'+':d<0?'−':'±';
+  wStat=`<span class="stat-n ${cls}">${sign}${fmt(Math.abs(d),1)} kg</span><span class="stat-l">Gewicht, Woche ${wfi[0]} → Woche ${wla[0]}</span>`;
+ }else wStat=`<span class="stat-n flat">–</span><span class="stat-l">Gewicht</span>`;
+ const [sfi,sla]=firstLast('sys'),[dfi,dla]=firstLast('dia');
+ const bpStat=(sfi&&sla&&dfi&&dla)?`<span class="stat-n flat">${fmt(sfi[1],0)}/${fmt(dfi[1],0)} → ${fmt(sla[1],0)}/${fmt(dla[1],0)}</span><span class="stat-l">Blutdruck, mmHg</span>`:`<span class="stat-n flat">–</span><span class="stat-l">Blutdruck, mmHg</span>`;
+ const ketoneStat=kd.length?`<span class="stat-n flat">${fmt(kd.reduce((s,d)=>s+d.k,0)/kd.length,2)} mmol/l</span><span class="stat-l">Ketone im Schnitt</span>`:`<span class="stat-n flat">–</span><span class="stat-l">Ketone im Schnitt</span>`;
  return `<div class="report">
- <div class="report-title"><p class="overline">Zusammenfassung</p><h1>Keto-Protokoll</h1><p class="subtitle">${st.name?esc(st.name)+' · ':''}Zeitraum ${fd(st.start,{day:'numeric',month:'long',year:'numeric'})} bis ${fd(end,{day:'numeric',month:'long',year:'numeric'})} · Einträge an ${inR.length} von ${N()} Tagen · Kohlenhydrat-Limit ${st.carbGoal} g/Tag</p></div>
+ <div class="report-title"><span class="tag">Auswertung, ${monthsApprox} ${monthsApprox===1?'Monat':'Monate'}</span><h1>Keto-Protokoll</h1><p class="subtitle">${st.name?esc(st.name)+' — ':''}${fd(st.start,{day:'numeric',month:'long',year:'numeric'})} bis ${fd(end,{day:'numeric',month:'long',year:'numeric'})}, Einträge an ${inR.length} von ${N()} Tagen</p><div class="rule"></div>
+ <table class="stats"><tr><td>${wStat}</td><td>${bpStat}</td><td>${ketoneStat}</td></tr></table></div>
  <h2>Verlauf im Überblick</h2>
  <p class="small">Mittelwerte der ersten und der letzten Woche mit Messwerten.</p>
- <table><thead><tr><th>Parameter</th><th>Einheit</th><th class="num">Anfang</th><th class="num">Ende</th><th class="num">Veränderung</th></tr></thead><tbody>
+ <table class="data"><thead><tr><th>Parameter</th><th>Einheit</th><th class="num">Anfang</th><th class="num">Ende</th><th class="num">Veränderung</th></tr></thead><tbody>
  ${DR.map(([l,f,u,d])=>row(l,u,d,firstLast(f))).join('')}${WR.map(([l,f,u,d])=>row(l,u,d,wfl(f))).join('')}</tbody></table>
  <h2>Umsetzung</h2>
  <p>Im Plan geblieben: ${pl.length?`${py} Tage voll, ${pt} teilweise, ${pl.length-py-pt} nicht (von ${pl.length} Tagen mit Angabe)`:'keine Angaben'}.</p>
@@ -605,16 +638,18 @@ function reportHTML(){
  <p>Kohlenhydrate: ${cd.length?`Ø ${fmt(cd.reduce((s,d)=>s+d.c,0)/cd.length,0)} g/Tag, an ${cOver} von ${cd.length} Tagen über dem Limit`:'keine Angaben'}.</p>
  <h2>Kurven</h2><div class="cg">${charts.join('')}</div>
  <h2>Laborwerte</h2>
- ${labs.length?`<table><thead><tr><th>Parameter</th><th>Einheit</th><th>Normbereich</th><th class="num">Ausgang${S.labDates.base?'<br><span class="small">'+fd(S.labDates.base,{day:'2-digit',month:'2-digit',year:'numeric'})+'</span>':''}</th><th class="num">Abschluss${S.labDates.end?'<br><span class="small">'+fd(S.labDates.end,{day:'2-digit',month:'2-digit',year:'numeric'})+'</span>':''}</th><th class="num">Veränderung</th></tr></thead><tbody>${labs.map(r=>`<tr><td>${esc(r.name)}</td><td>${esc(r.unit)}</td><td>${esc(r.range)||'–'}</td><td class="num">${esc(r.base)||'–'}${isOutOfRange(num(r.base),r.range)?'<sup>*</sup>':''}</td><td class="num">${esc(r.end)||'–'}${isOutOfRange(num(r.end),r.range)?'<sup>*</sup>':''}</td><td class="num">${delta(r.base,r.end,2).replace(/<[^>]+>/g,'')}</td></tr>`).join('')}</tbody></table>${labs.some(r=>isOutOfRange(num(r.base),r.range)||isOutOfRange(num(r.end),r.range))?'<p class="small">* außerhalb des angegebenen Normbereichs</p>':''}`:'<p>Keine Laborwerte eingetragen.</p>'}
+ ${labs.length?`<table class="data"><thead><tr><th>Parameter</th><th>Einheit</th><th>Normbereich</th><th class="num">Ausgang${S.labDates.base?'<br><span class="small">'+fd(S.labDates.base,{day:'2-digit',month:'2-digit',year:'numeric'})+'</span>':''}</th><th class="num">Abschluss${S.labDates.end?'<br><span class="small">'+fd(S.labDates.end,{day:'2-digit',month:'2-digit',year:'numeric'})+'</span>':''}</th><th class="num">Veränderung</th></tr></thead><tbody>${labs.map(r=>`<tr><td>${esc(r.name)}</td><td>${esc(r.unit)}</td><td>${esc(r.range)||'–'}</td><td class="num">${esc(r.base)||'–'}${isOutOfRange(num(r.base),r.range)?'<sup>*</sup>':''}</td><td class="num">${esc(r.end)||'–'}${isOutOfRange(num(r.end),r.range)?'<sup>*</sup>':''}</td><td class="num">${delta(r.base,r.end,2).replace(/<[^>]+>/g,'')}</td></tr>`).join('')}</tbody></table>${labs.some(r=>isOutOfRange(num(r.base),r.range)||isOutOfRange(num(r.end),r.range))?'<p class="small">* außerhalb des angegebenen Normbereichs</p>':''}`:'<p>Keine Laborwerte eingetragen.</p>'}
  ${S.settings.meds.length?`<h2>Medikation</h2>
- <table><thead><tr><th>Name</th><th>Dosis</th><th>Kategorie</th><th class="num">Einnahme (gesamter Zeitraum)</th></tr></thead><tbody>${S.settings.meds.map(m=>{const {taken,logged}=medAdherence(st.start,end,m.id);return `<tr><td>${esc(m.name)}</td><td>${esc(m.dose)}</td><td>${esc(m.category)}</td><td class="num">${logged?fmt(taken/logged*100,0)+' %':'–'} <span class="small">(${logged} Tage erfasst)</span></td></tr>`}).join('')}</tbody></table>
- ${S.doseChanges.length?`<p class="small" style="margin-top:2mm">Dosisänderungen</p><table><thead><tr><th>Datum</th><th>Medikament</th><th>Alte Dosis</th><th>Neue Dosis</th></tr></thead><tbody>${[...S.doseChanges].sort((a,b)=>a.date<b.date?-1:a.date>b.date?1:0).map(c=>{const m=S.settings.meds.find(x=>x.id===c.medId);return `<tr><td>${fd(c.date)}</td><td>${esc(m?m.name:'–')}</td><td>${esc(c.oldDose)||'–'}</td><td>${esc(c.newDose)}</td></tr>`}).join('')}</tbody></table>`:''}`:''}
+ <table class="data"><thead><tr><th>Name</th><th>Dosis</th><th>Kategorie</th><th class="num">Einnahme (gesamter Zeitraum)</th></tr></thead><tbody>${S.settings.meds.map(m=>{const {taken,logged}=medAdherence(st.start,end,m.id);return `<tr><td>${esc(m.name)}</td><td>${esc(m.dose)}</td><td>${esc(m.category)}</td><td class="num">${logged?fmt(taken/logged*100,0)+' %':'–'} <span class="small">(${logged} Tage erfasst)</span></td></tr>`}).join('')}</tbody></table>
+ ${S.doseChanges.length?`<p class="small" style="margin-top:2mm">Dosisänderungen</p><table class="data"><thead><tr><th>Datum</th><th>Medikament</th><th>Alte Dosis</th><th>Neue Dosis</th></tr></thead><tbody>${[...S.doseChanges].sort((a,b)=>a.date<b.date?-1:a.date>b.date?1:0).map(c=>{const m=S.settings.meds.find(x=>x.id===c.medId);return `<tr><td>${fd(c.date)}</td><td>${esc(m?m.name:'–')}</td><td>${esc(c.oldDose)||'–'}</td><td>${esc(c.newDose)}</td></tr>`}).join('')}</tbody></table>`:''}`:''}
  <h2>Beschwerden</h2>
- ${symC.length?`<table><thead><tr><th>Beschwerde</th>${Array.from({length:months},(_,i)=>`<th class="num">Tage ${i*30+1}–${Math.min((i+1)*30,N())}</th>`).join('')}</tr></thead><tbody>${symC.map(([s,c])=>`<tr><td>${s}</td>${c.map(x=>`<td class="num">${x||''}</td>`).join('')}</tr>`).join('')}</tbody></table>`:'<p>Keine Beschwerden notiert.</p>'}
+ ${symC.length?`<table class="data"><thead><tr><th>Beschwerde</th>${Array.from({length:months},(_,i)=>`<th class="num">Tage ${i*30+1}–${Math.min((i+1)*30,N())}</th>`).join('')}</tr></thead><tbody>${symC.map(([s,c])=>`<tr><td>${s}</td>${c.map(x=>`<td class="num">${x||''}</td>`).join('')}</tr>`).join('')}</tbody></table>`:'<p>Keine Beschwerden notiert.</p>'}
  ${wn.length||dn.length?`<h2>Notizen</h2>${wn.map(n=>`<p><b>Woche ${n}:</b> ${esc(S.weeks[n].note)}</p>`).join('')}${dn.length?`<p class="small" style="margin-top:2mm">${dn.map(([ds,d])=>`<b>${fd(ds)}</b> ${esc(d.note)}`).join(' &nbsp; ')}</p>`:''}`:''}
  <h2>Beobachtungen für das Gespräch</h2>
- <p class="small">Beobachtungen aus den erfassten Daten, keine medizinische Bewertung — als Gesprächsgrundlage gedacht.</p>
+ <div class="callout">
+ <p class="note">Beobachtungen aus den erfassten Daten, keine medizinische Bewertung — als Gesprächsgrundlage gedacht.</p>
  ${talkingPoints.length?`<ul>${talkingPoints.map(p=>`<li>${p}</li>`).join('')}</ul>`:'<p>Keine auffälligen Muster in diesem Zeitraum.</p>'}
+ </div>
  <h2>Fragen für die Besprechung</h2><div class="qs">${esc(st.questions)}</div>
  <p class="small" style="margin-top:4mm">Keto-Protokoll v${VERSION}</p>
  </div>`;
