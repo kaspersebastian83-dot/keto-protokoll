@@ -20,10 +20,13 @@ function today() {
 
 // A minimal, fully-migrated empty state matching what load() produces.
 function blankState(overrides = {}) {
+  const settings = { name: '', start: today(), days: 90, carbGoal: 50, questions: '', lastBackup: null, meds: [], backupWarnDismissed: null,
+    alerts: { sysMin: null, sysMax: null, diaMin: null, diaMax: null, gMin: null, gMax: null, pMin: null, pMax: null, action: '' },
+    ...overrides.settings };
+  if (!Object.prototype.hasOwnProperty.call(overrides.settings || {}, 'carbGoalHistory')) settings.carbGoalHistory = [{ date: null, value: settings.carbGoal }];
+  if (!Object.prototype.hasOwnProperty.call(overrides.settings || {}, 'alertHistory')) settings.alertHistory = [{ date: null, value: { ...settings.alerts } }];
   return {
-    dataVersion: 4,
-    settings: { name: '', start: today(), days: 90, carbGoal: 50, questions: '', lastBackup: null, meds: [], backupWarnDismissed: null,
-      alerts: { sysMin: null, sysMax: null, diaMin: null, diaMax: null, gMin: null, gMax: null, pMin: null, pMax: null, action: '' } },
+    dataVersion: 5,
     days: {},
     weeks: {},
     labs: [],
@@ -32,6 +35,7 @@ function blankState(overrides = {}) {
     archive: [],
     refRead: {},
     ...overrides,
+    settings,
   };
 }
 

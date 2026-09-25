@@ -7,7 +7,8 @@ test.describe('Period handling', () => {
     const start = addDays(today(), -30);
     const liveSettings = blankState().settings;
     const state = blankState({
-      settings: { ...liveSettings, name: 'Live Name', alerts: { ...liveSettings.alerts, sysMax: 140 } },
+      settings: { ...liveSettings, name: 'Live Name', alerts: { ...liveSettings.alerts, sysMax: 140 },
+        alertHistory: [{ date: null, value: { ...liveSettings.alerts, sysMax: 140 } }] },
       days: { [today()]: { sys1: 119, dia1: 76, sys: 119, dia: 76 } },
       archive: [{
         label: 'Legacy period', archivedAt: '2026-02-01',
@@ -26,7 +27,7 @@ test.describe('Period handling', () => {
       live: { name: S.settings.name, alerts: S.settings.alerts, day: S.days[today()] },
     }));
     expect(result.metadata).toEqual({ label: 'Legacy period', archivedAt: '2026-02-01' });
-    expect(result.archived.dataVersion).toBe(4);
+    expect(result.archived.dataVersion).toBe(5);
     expect(result.archived.settings.name).toBe('Archived Name');
     expect(result.archived.settings.start).toBe(start);
     expect(result.archived.settings.carbGoal).toBe(42);
@@ -93,7 +94,7 @@ test.describe('Period handling', () => {
     const result = await page.evaluate(() => ({ archive: S.archive[0], liveMeds: S.settings.meds }));
     expect(result.archive.label).toBe('Old period');
     expect(result.archive.archivedAt).toBe('2026-02-01');
-    expect(result.archive.data.dataVersion).toBe(4);
+    expect(result.archive.data.dataVersion).toBe(5);
     expect(result.archive.data.settings.meds).toEqual([{ ...legacyMed, startedAt: null, stoppedAt: null }]);
     expect(result.liveMeds).toEqual([]);
   });
@@ -322,6 +323,101 @@ test.describe('Period handling', () => {
     expect(result.restored).toBe(true);
     expect(result.unchanged).toBe(true);
     expect(result.reportFunctionRestored).toBe(true);
+  });
+
+  test('load migrates a v4 archived snapshot to undated goal and alert baselines without copying live settings', async ({ page }) => {
+    await gotoApp(page);
+    const oldAlerts = { ...blankState().settings.alerts, gMax: 180, action: 'Archived action' };
+    const liveAlerts = { ...blankState().settings.alerts, gMax: 140, action: 'Live action' };
+    await seed(page, blankState({
+      settings: { ...blankState().settings, carbGoal: 20, alerts: liveAlerts,
+        carbGoalHistory: [{ date: null, value: 20 }], alertHistory: [{ date: null, value: liveAlerts }] },
+      archive: [{ label: 'Old period', archivedAt: '2026-02-01', extra: 'Keep me', data: {
+        dataVersion: 4, settings: { name: 'Archived', start: '2026-01-01', days: 7, carbGoal: 45, alerts: oldAlerts }, days: {},
+      } }],
+    }));
+    const result = await page.evaluate(() => ({
+      entry: S.archive[0], liveGoal: S.settings.carbGoal, liveAlerts: S.settings.alerts,
+      detached: S.archive[0].data.settings.alertHistory[0].value !== S.archive[0].data.settings.alerts,
+    }));
+    expect(result.entry.label).toBe('Old period');
+    expect(result.entry.archivedAt).toBe('2026-02-01');
+    expect(result.entry.extra).toBe('Keep me');
+    expect(result.entry.data.dataVersion).toBe(5);
+    expect(result.entry.data.settings.carbGoalHistory).toEqual([{ date: null, value: 45 }]);
+    expect(result.entry.data.settings.alertHistory).toEqual([{ date: null, value: oldAlerts }]);
+    expect(result.detached).toBe(true);
+    expect(result.liveGoal).toBe(20);
+    expect(result.liveAlerts).toEqual(liveAlerts);
+  });
+
+  test('new round archives full dated histories and carries only today\'s values into detached fresh histories', async ({ page }) => {
+    await gotoApp(page);
+    const start = addDays(today(), -20), change = addDays(today(), -5);
+    const oldAlerts = { ...blankState().settings.alerts, gMax: 180 };
+    const currentAlerts = { ...blankState().settings.alerts, gMax: 160 };
+    const med = { id: 'medA', name: 'Synthetic med', dose: '10 mg', category: 'Medikament', startedAt: start, stoppedAt: null };
+    const changes = [{ date: addDays(start, 2), medId: med.id, oldDose: '5 mg', newDose: '10 mg' }];
+    const goalHistory = [{ date: null, value: 50 }, { date: change, value: 30 }];
+    const alertHistory = [{ date: null, value: oldAlerts }, { date: change, value: currentAlerts }];
+    await seed(page, blankState({ settings: { ...blankState().settings, start, carbGoal: 30, alerts: currentAlerts,
+      carbGoalHistory: goalHistory, alertHistory, meds: [med] }, doseChanges: changes }));
+    const result = await page.evaluate(() => {
+      startNewRound();
+      const archived = S.archive[0].data.settings;
+      const before = JSON.stringify([archived.carbGoalHistory, archived.alertHistory]);
+      const freshGoals = JSON.parse(JSON.stringify(S.settings.carbGoalHistory));
+      const freshAlerts = JSON.parse(JSON.stringify(S.settings.alertHistory));
+      S.settings.carbGoalHistory[0].value = 99;
+      S.settings.alertHistory[0].value.gMax = 99;
+      return {
+        archivedGoals: archived.carbGoalHistory, archivedAlerts: archived.alertHistory,
+        archivedUnchanged: JSON.stringify([archived.carbGoalHistory, archived.alertHistory]) === before,
+        freshGoals, freshAlerts, liveGoals: S.settings.carbGoalHistory, liveAlerts: S.settings.alertHistory,
+        scalars: [S.settings.carbGoal, S.settings.alerts.gMax],
+        archivedMeds: archived.meds, liveMeds: S.settings.meds,
+        archivedChanges: S.archive[0].data.doseChanges, liveChanges: S.doseChanges,
+      };
+    });
+    expect(result.archivedGoals).toEqual(goalHistory);
+    expect(result.archivedAlerts).toEqual(alertHistory);
+    expect(result.archivedUnchanged).toBe(true);
+    expect(result.freshGoals).toEqual([{ date: today(), value: 30 }]);
+    expect(result.freshAlerts).toEqual([{ date: today(), value: currentAlerts }]);
+    expect(result.liveGoals).toEqual([{ date: today(), value: 99 }]);
+    expect(result.liveAlerts[0]).toEqual({ date: today(), value: { ...currentAlerts, gMax: 99 } });
+    expect(result.scalars).toEqual([30, 160]);
+    expect(result.archivedMeds).toEqual([med]);
+    expect(result.liveMeds).toEqual([med]);
+    expect(result.archivedChanges).toEqual(changes);
+    expect(result.liveChanges).toEqual([]);
+  });
+
+  test('archived report uses archived dated settings and restores the exact live object', async ({ page }) => {
+    await gotoApp(page);
+    const start = addDays(today(), -14), change = addDays(start, 7);
+    const old = { ...blankState().settings.alerts, gMax: 180 };
+    const next = { ...blankState().settings.alerts, gMax: 160 };
+    const archived = blankState({ settings: { ...blankState().settings, name: 'Archived', start, days: 14,
+      carbGoal: 30, alerts: next, carbGoalHistory: [{ date: null, value: 50 }, { date: change, value: 30 }],
+      alertHistory: [{ date: null, value: old }, { date: change, value: next }] },
+      days: { [addDays(start, 1)]: { c: 40, g: 170 }, [addDays(start, 8)]: { c: 40, g: 170 } } });
+    await seed(page, blankState({ settings: { ...blankState().settings, name: 'Live', carbGoal: 10,
+      carbGoalHistory: [{ date: null, value: 10 }] },
+      archive: [{ label: 'Archived', archivedAt: today(), data: archived }] }));
+    const result = await page.evaluate(() => {
+      window.print = () => {};
+      const live = S, before = JSON.stringify(S);
+      viewArchivedReport(0);
+      return { restored: S === live, unchanged: JSON.stringify(S) === before,
+        html: document.getElementById('print').innerHTML };
+    });
+    expect(result.restored).toBe(true);
+    expect(result.unchanged).toBe(true);
+    expect(result.html).toContain('Archived');
+    expect(result.html).toContain('an 1 von 2 Tagen über dem jeweils gültigen Limit');
+    expect(result.html).toContain('max 160 mg/dl');
+    expect(result.html).not.toContain('max 180 mg/dl');
   });
 
   test('deleting an archive entry does not affect the live period', async ({ page }) => {

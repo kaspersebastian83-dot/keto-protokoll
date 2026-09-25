@@ -95,7 +95,7 @@ td.num,th.num{text-align:right}
 .s2{stroke:var(--s2)}.s2d{fill:var(--s2)}
 .s3{stroke:var(--keto)}.s3d{fill:var(--keto)}
 .band{fill:var(--ketoBand)}
-.goal{stroke:var(--warn);stroke-dasharray:5 4;stroke-width:1.3}
+.goal{fill:none;stroke:var(--warn);stroke-dasharray:5 4;stroke-width:1.3}
 .key{display:inline-block;width:14px;height:3px;vertical-align:middle;margin:0 4px 0 10px}
 #status{position:fixed;right:12px;bottom:calc(12px + env(safe-area-inset-bottom,0px));background:var(--ink);color:var(--paper);padding:6px 12px;border-radius:4px;font-size:.9rem;opacity:0;transition:opacity .2s;pointer-events:none}
 #status.show{opacity:1}
@@ -215,7 +215,7 @@ td.num,th.num{text-align:right}
 
 <script>
 const KEY='ketoProtokoll_v1';
-const VERSION='1.5.3'; // keep in sync with package.json, package-lock.json, and sw.js
+const VERSION='1.5.4'; // keep in sync with package.json, package-lock.json, and sw.js
 const SYMS=['Kopfschmerz','Müdigkeit','Muskelkrämpfe','Verdauung','Schwindel','Schlecht geschlafen','Heißhunger','Herzklopfen','Gereizt'];
 const DEFAULT_LABS=[['HbA1c','%'],['Glukose nüchtern','mg/dl'],['Gesamtcholesterin','mg/dl'],['LDL-Cholesterin','mg/dl'],['HDL-Cholesterin','mg/dl'],['Triglyzeride','mg/dl'],['Harnsäure','mg/dl'],['Kreatinin','mg/dl'],['eGFR','ml/min'],['GPT (ALT)','U/l'],['GOT (AST)','U/l'],['Gamma-GT','U/l'],['Natrium','mmol/l'],['Kalium','mmol/l'],['Magnesium','mmol/l'],['TSH','mU/l'],['CRP','mg/l']];
 const REFERENCES=[
@@ -314,7 +314,7 @@ const vv=x=>x==null?'':String(x).replace('.',',');
 const uid=()=>'m'+Date.now().toString(36)+Math.random().toString(36).slice(2,7);
 
 let S;
-const DATA_VERSION=4;
+const DATA_VERSION=5;
 // Upgrades one saved state to the current shape without traversing its archive.
 // Shared by live data, backup import, and archived snapshots.
 function migrateState(data){
@@ -363,6 +363,11 @@ function migrateState(data){
   });
   v=4;
  }
+ if(v<5){
+  if(!Array.isArray(d.settings.carbGoalHistory))d.settings.carbGoalHistory=[{date:null,value:d.settings.carbGoal}];
+  if(!Array.isArray(d.settings.alertHistory))d.settings.alertHistory=[{date:null,value:{...d.settings.alerts}}];
+  v=5;
+ }
  d.dataVersion=v;
  return d;
 }
@@ -387,6 +392,7 @@ function load(){
  let raw=null;
  try{raw=JSON.parse(localStorage.getItem(KEY))}catch(e){raw=null}
  S=migrate(raw);
+ syncCurrentSettings();
 }
 let stT;
 function save(msg){
@@ -435,17 +441,60 @@ function recomputeBP(d){
 }
 function bpReadingMsg(sys,dia){return checkPlausibility('sys',sys,dia)||checkPlausibility('dia',dia,null)||''}
 function bpDiffMsg(d){return (d.sys1!=null&&d.sys2!=null&&Math.abs(d.sys1-d.sys2)>15)?'Messungen weichen stark ab — evtl. eine dritte Messung':''}
-// Doctor-agreed alert thresholds. Never defaulted — only ever what the user
-// entered in Einstellungen. A reminder of the doctor's own instructions, not
-// a medical assessment, so wording stays neutral throughout.
-// S.settings.alerts may be absent on archived data (a snapshot from before
-// this feature existed, or from another pre-migrate() source) — guard
-// against that rather than requiring every historical snapshot to migrate.
-function hasAlertsSet(){const al=S.settings.alerts;if(!al)return false;return ['sysMin','sysMax','diaMin','diaMax','gMin','gMax','pMin','pMax'].some(k=>al[k]!=null)}
+// A null date is the undated legacy baseline. Reading history never changes it.
+const historyDateOrder=(a,b)=>{
+ if(a.date!==b.date)return a.date===null?-1:b.date===null?1:a.date<b.date?-1:1;
+ const av=JSON.stringify(a.value),bv=JSON.stringify(b.value);
+ return av<bv?-1:av>bv?1:0;
+};
+function validHistoryEntries(history,validValue){
+ if(!Array.isArray(history))return [];
+ const sorted=history.filter(e=>e&&typeof e==='object'&&(e.date===null||validISODate(e.date))&&validValue(e.value)).sort(historyDateOrder);
+ return sorted.filter((e,i)=>i===sorted.length-1||e.date!==sorted[i+1].date);
+}
+const validGoal=v=>typeof v==='number'&&Number.isFinite(v)&&v>0;
+const validAlerts=v=>v&&typeof v==='object'&&!Array.isArray(v);
+function historyAt(history,date,fallback,validValue){
+ const entries=validHistoryEntries(history,validValue).filter(e=>e.date===null||e.date<=date);
+ return entries.length?entries.at(-1).value:fallback;
+}
+function carbGoalOnDate(date){return historyAt(S.settings.carbGoalHistory,date,S.settings.carbGoal,validGoal)}
+function alertsOnDate(date){return historyAt(S.settings.alertHistory,date,S.settings.alerts||{},validAlerts)}
+function upsertHistory(key,date,value,validValue){
+ const existing=validHistoryEntries(S.settings[key],validValue);
+ const fallback=key==='carbGoalHistory'?S.settings.carbGoal:{...(S.settings.alerts||{})};
+ const history=(existing.length?existing:[{date:null,value:fallback}]).filter(e=>e.date!==date);
+ history.push({date,value});
+ S.settings[key]=history.sort(historyDateOrder);
+}
+function upsertCarbGoalHistory(date,value){upsertHistory('carbGoalHistory',date,value,validGoal)}
+function upsertAlertHistory(date,value){upsertHistory('alertHistory',date,{...value},validAlerts)}
+function syncCurrentSettings(){
+ S.settings.carbGoal=carbGoalOnDate(today());
+ S.settings.alerts={...alertsOnDate(today())};
+}
+// The first value applies at range start; subsequent entries become effective
+// inside the range. Earlier dated events are included only as that first value.
+function historyInRange(history,from,to,fallback,validValue){
+ const entries=validHistoryEntries(history,validValue);
+ const prior=entries.filter(e=>e.date===null||e.date<=from).at(-1);
+ return [{date:prior?prior.date:null,value:prior?prior.value:fallback},
+  ...entries.filter(e=>e.date!==null&&e.date>from&&e.date<=to)];
+}
+function carbGoalsInRange(from,to){return historyInRange(S.settings.carbGoalHistory,from,to,S.settings.carbGoal,validGoal)}
+function alertConfigsInRange(from,to){return historyInRange(S.settings.alertHistory,from,to,S.settings.alerts||{},validAlerts)}
+function coalescedAlertConfigsInRange(from,to){
+ const fields=['sysMin','sysMax','diaMin','diaMax','gMin','gMax','pMin','pMax','action'];
+ const configs=alertConfigsInRange(from,to);
+ return configs.filter((e,i)=>i===0||fields.some(k=>e.value[k]!==configs[i-1].value[k]));
+}
+// Doctor-agreed alert thresholds are observations against user-entered limits,
+// not medical assessments. Individual BP readings keep their own checks.
+function hasAlertsSet(date=today()){const al=typeof date==='string'?alertsOnDate(date):date;if(!al)return false;return ['sysMin','sysMax','diaMin','diaMax','gMin','gMax','pMin','pMax'].some(k=>al[k]!=null)}
 // Checks every individual BP reading (not the averaged sys/dia — a single low
 // reading on BP medication matters on its own), plus glucose and pulse.
-function checkAlerts(d){
- const al=S.settings.alerts||{},hits=[];
+function checkAlerts(d,date=today()){
+ const al=alertsOnDate(date),hits=[];
  const check=(label,val,minK,maxK,unit)=>{
   if(val==null)return;
   if(al[minK]!=null&&val<al[minK])hits.push({label,value:val,limit:al[minK],dir:'min',unit});
@@ -462,8 +511,8 @@ function checkAlerts(d){
 function alertHitText(h){return `${h.label}: ${fmt(h.value,0)} ${h.unit} (vereinbarte Grenze ${h.dir==='min'?'min':'max'} ${fmt(h.limit,0)} ${h.unit})`}
 // One compact line for print surfaces (fridge sheet footer, report), e.g.
 // "Vereinbarte Grenzen: RR sys 100–160, dia 60–100 · BZ 70–180 → Praxis anrufen".
-function alertsSummaryText(){
- const al=S.settings.alerts,parts=[];
+function alertsSummaryText(date=today()){
+ const al=typeof date==='string'?alertsOnDate(date):date,parts=[];
  const range=(min,max)=>`${min??'–'}–${max??'–'}`;
  const sys=al.sysMin!=null||al.sysMax!=null?`sys ${range(al.sysMin,al.sysMax)}`:null;
  const dia=al.diaMin!=null||al.diaMax!=null?`dia ${range(al.diaMin,al.diaMax)}`:null;
@@ -511,10 +560,9 @@ let curWeek=1;
 function renderHead(){
  const st=S.settings,t=today(),i=diffDays(st.start,t)+1;
  $('#hsub').textContent=(st.name?st.name+', ':'')+(i<1?`Start am ${fd(st.start,{day:'numeric',month:'long'})}`:i>N()?`Zeitraum abgeschlossen (${N()} Tage)`:`Tag ${i} von ${N()}, Woche ${Math.ceil(i/7)}`);
- const alertsSet=hasAlertsSet();
  let h='';
  for(let k=0;k<N();k++){const ds=addDays(st.start,k),d=S.days[ds];const n=d?['w','g','k','sys','c'].filter(f=>d[f]!=null).length:0;
-  const flagged=alertsSet&&d&&checkAlerts(d).length>0;
+  const flagged=d&&hasAlertsSet(ds)&&checkAlerts(d,ds).length>0;
   h+=`<button type="button" data-date="${ds}" class="${n>=4?'done':n?'part':''}${ds===t?' today':''}${ds===curDate&&curTab==='day'?' cur':''}" title="Tag ${k+1}, ${fd(ds)}" aria-label="Tag ${k+1}, ${fd(ds)}${flagged?', außerhalb vereinbarter Grenze':''}">${flagged?'<span class="alert-dot"></span>':''}</button>`}
  $('#strip').innerHTML=h;
  const nd=$('#nudge');
@@ -568,26 +616,26 @@ function backupWarnHTML(){
  const lb=daysSinceBackup();
  return `<div class="panel warnpanel" id="backupWarn"><p>${lb===null?'Noch kein Backup gemacht':`Letztes Backup vor ${lb} Tagen`} — die Daten liegen nur in diesem Browser.</p><div class="btns"><button type="button" class="btn primary" id="backupWarnExp">Jetzt sichern</button><button type="button" class="btn" id="backupWarnDismiss">Für heute ausblenden</button></div></div>`;
 }
-function alertPanelHTML(hits){
- const action=S.settings.alerts.action;
+function alertPanelHTML(hits,date){
+ const action=alertsOnDate(date).action;
  return `<div class="panel warnpanel" id="alertWarn"><p>Außerhalb der mit dem Arzt vereinbarten Grenze</p><ul>${hits.map(h=>`<li>${esc(alertHitText(h))}</li>`).join('')}</ul>${action?`<p class="small">${esc(action)}</p>`:''}</div>`;
 }
 // Called after any value that feeds checkAlerts() changes, so the panel
 // reflects the crossing live without a full renderDay() (which would be
 // disruptive mid-edit for the fields that trigger on blur).
 function updateAlertPanel(d){
- const hits=checkAlerts(d),existing=$('#alertWarn');
+ const hits=checkAlerts(d,curDate),existing=$('#alertWarn');
  if(hits.length){
-  if(existing)existing.outerHTML=alertPanelHTML(hits);
-  else $('#v-day').insertAdjacentHTML('afterbegin',alertPanelHTML(hits));
+  if(existing)existing.outerHTML=alertPanelHTML(hits,curDate);
+  else $('#v-day').insertAdjacentHTML('afterbegin',alertPanelHTML(hits,curDate));
  }else if(existing)existing.remove();
 }
 function renderDay(){
  const d=S.days[curDate]||{},i=diffDays(S.settings.start,curDate),inR=i>=0&&i<N();
  const meds=S.settings.meds.filter(m=>medAppliesOnDate(m,curDate));
  const showBackupWarn=backupUrgency()==='critical'&&S.settings.backupWarnDismissed!==today();
- const alertHits=checkAlerts(d);
- let h=`${alertHits.length?alertPanelHTML(alertHits):''}${showBackupWarn?backupWarnHTML():''}<div class="datebar"><button type="button" class="btn" data-nav="-1" aria-label="Vorheriger Tag">‹</button><input type="date" id="dpick" value="${curDate}" aria-label="Datum"><button type="button" class="btn" data-nav="1" aria-label="Nächster Tag">›</button>${curDate!==today()?'<button type="button" class="btn" data-nav="0">Heute</button>':''}</div>
+ const alertHits=checkAlerts(d,curDate);
+ let h=`${alertHits.length?alertPanelHTML(alertHits,curDate):''}${showBackupWarn?backupWarnHTML():''}<div class="datebar"><button type="button" class="btn" data-nav="-1" aria-label="Vorheriger Tag">‹</button><input type="date" id="dpick" value="${curDate}" aria-label="Datum"><button type="button" class="btn" data-nav="1" aria-label="Nächster Tag">›</button>${curDate!==today()?'<button type="button" class="btn" data-nav="0">Heute</button>':''}</div>
  <p class="sub" style="margin-bottom:12px">${fd(curDate,{weekday:'long',day:'numeric',month:'long'})}${inR?`, Tag ${i+1}`:', außerhalb des Zeitraums'}</p>
  <div class="panel"><h2>Morgens, nüchtern</h2>
  ${numRow('w','Gewicht','nach dem Aufstehen','kg',d,'decimal',plausMsg('w',d))}
@@ -597,7 +645,7 @@ function renderDay(){
  ${numRow('p','Puls','optional, vom Blutdruckgerät','/min',d,'numeric',plausMsg('p',d))}
  </div>
  <div class="panel"><h2>Über den Tag</h2>
- ${numRow('c','Kohlenhydrate',`grob geschätzt, Limit ${S.settings.carbGoal} g`,'g',d,'numeric',plausMsg('c',d))}
+ ${numRow('c','Kohlenhydrate',`grob geschätzt, Limit ${carbGoalOnDate(curDate)} g`,'g',d,'numeric',plausMsg('c',d))}
  ${scaleRow('en','Energie','1 schlapp, 5 topfit',d)}
  ${scaleRow('hu','Hunger','1 kaum, 5 stark',d)}
  <div class="row"><div class="lbl"><b>Im Plan geblieben?</b></div><div class="seg" role="group" aria-label="Im Plan geblieben">${[['y','Ja'],['t','Teils'],['n','Nein']].map(([k,l])=>`<button type="button" data-plan="${k}" class="${d.plan===k?'on':''}" aria-pressed="${d.plan===k}">${l}</button>`).join('')}</div></div>
@@ -709,9 +757,9 @@ const wser=f=>Object.entries(S.weeks).map(([n,w])=>[(n-1)*7+3,w[f]]).filter(p=>p
 function chart(title,series,o={}){
  const pts=series.flatMap(s=>s.pts);
  const cap=`<figcaption>${title}${o.unit?` <span class="sub">(${o.unit})</span>`:''}</figcaption>`;
- if(!pts.length)return `<figure class="chart">${cap}<p class="sub">Noch keine Werte.</p></figure>`;
+ if(!pts.length&&!o.goalSteps)return `<figure class="chart">${cap}<p class="sub">Noch keine Werte.</p></figure>`;
  const n=N(),W=600,H=o.h||170,L=44,R=10,T=10,B=22;
- const ys=pts.map(p=>p[1]);if(o.band)ys.push(...o.band);if(o.goal!=null)ys.push(o.goal);
+ const ys=pts.map(p=>p[1]);if(o.band)ys.push(...o.band);if(o.goal!=null)ys.push(o.goal);if(o.goalSteps)ys.push(...o.goalSteps.map(p=>p[1]));
  let lo=Math.min(...ys),hi=Math.max(...ys),pad=(hi-lo)*.15;if(!pad)pad=Math.abs(hi)*.05||1;lo-=pad;hi+=pad;
  const X=x=>L+x/(n-1)*(W-L-R),Y=y=>T+(1-(y-lo)/(hi-lo))*(H-T-B);
  const dec=hi-lo<3?2:hi-lo<15?1:0;
@@ -720,6 +768,13 @@ function chart(title,series,o={}){
  for(let i=0;i<=4;i++){const y=lo+(hi-lo)*i/4,py=Y(y).toFixed(1);g+=`<line class="gl" x1="${L}" x2="${W-R}" y1="${py}" y2="${py}"/><text x="${L-6}" y="${+py+4}" text-anchor="end">${fmt(y,dec)}</text>`}
  for(let w=0;w*7<n;w+=2)g+=`<text x="${X(w*7).toFixed(1)}" y="${H-5}">W${w+1}</text>`;
  if(o.goal!=null)g+=`<line class="goal" x1="${L}" x2="${W-R}" y1="${Y(o.goal).toFixed(1)}" y2="${Y(o.goal).toFixed(1)}"/>`;
+ if(o.goalSteps){
+  const steps=o.goalSteps;
+  let path=`M${X(0).toFixed(1)},${Y(steps[0][1]).toFixed(1)}`;
+  for(let i=1;i<steps.length;i++)path+=`H${X(steps[i][0]).toFixed(1)}V${Y(steps[i][1]).toFixed(1)}`;
+  path+=`H${X(n-1).toFixed(1)}`;
+  g+=`<path class="goal" d="${path}"/>`;
+ }
  if(o.markers)o.markers.filter(mk=>mk.x>=0&&mk.x<n).forEach(mk=>{const mx=X(mk.x).toFixed(1);g+=`<line class="goal" x1="${mx}" x2="${mx}" y1="${T}" y2="${H-B}"/><text x="${mx}" y="${T+9}" transform="rotate(-90,${mx},${T+9})" text-anchor="start">${esc(mk.label)}</text>`});
  series.forEach(s=>{if(!s.pts.length)return;const sp=[...s.pts].sort((a,b)=>a[0]-b[0]);
   g+=`<path class="${s.cls}" d="M${sp.map(p=>X(p[0]).toFixed(1)+','+Y(p[1]).toFixed(1)).join('L')}"/>`;
@@ -772,12 +827,14 @@ function chart2(labelA,ptsA,unitA,labelB,ptsB,unitB){
  return `<figure class="chart">${cap}<svg viewBox="0 0 ${W} ${H}" role="img" aria-label="${labelA} / ${labelB}">${g}</svg><p class="sub" style="color:var(--ink)"><span class="key" style="background:var(--ink)"></span>${labelA} (${unitA})</p><p class="sub" style="color:var(--s2)"><span class="key" style="background:var(--s2)"></span>${labelB} (${unitB})</p></figure>`;
 }
 function chartSet(){
+ const start=S.settings.start,end=addDays(start,N()-1);
+ const goalSteps=carbGoalsInRange(start,end).map(e=>[e.date&&e.date>start?diffDays(start,e.date):0,e.value]);
  return [
   chart('Gewicht',[{pts:ser('w'),cls:'s1'}],{unit:'kg'}),
   chart('Blutzucker nüchtern',[{pts:ser('g'),cls:'s1'}],{unit:'mg/dl'}),
   chart('Ketone',[{pts:ser('k'),cls:'s3'}],{unit:'mmol/l',band:[0.5,3],note:'Grüne Fläche: 0,5–3,0 mmol/l, der übliche Bereich einer ernährungsbedingten Ketose.'}),
   chart('Blutdruck',[{pts:ser('sys'),cls:'s1'},{pts:ser('dia'),cls:'s2'}],{unit:'mmHg',markers:doseMarkers(),note:'<span class="key" style="background:var(--ink)"></span>systolisch<span class="key" style="background:var(--s2)"></span>diastolisch. Gestrichelte senkrechte Linie: Dosisänderung.'}),
-  chart('Kohlenhydrate',[{pts:ser('c'),cls:'s2'}],{unit:'g/Tag',goal:S.settings.carbGoal,note:'Gestrichelt: dein Limit.'}),
+  chart('Kohlenhydrate',[{pts:ser('c'),cls:'s2'}],{unit:'g/Tag',goalSteps,note:'Gestrichelt: das jeweils gültige Limit.'}),
   chart('Ruhepuls (Garmin, Wochenmittel)',[{pts:wser('rhr'),cls:'s1'}],{unit:'/min'}),
   chart('Bauchumfang',[{pts:wser('waist'),cls:'s1'}],{unit:'cm'})
  ];
@@ -808,6 +865,10 @@ window.addEventListener('afterprint',()=>{$('#print').innerHTML=''});
 
 function sheetHTML(wn,fill){
  const [a,b]=weekRange(wn),days=Array.from({length:7},(_,i)=>addDays(a,i));
+ const goals=carbGoalsInRange(a,b).map(e=>e.value).filter((v,i,all)=>i===0||v!==all[i-1]);
+ const configs=coalescedAlertConfigsInRange(a,b);
+ const alertFooter=configs.some(e=>hasAlertsSet(e.value))?(configs.length===1?alertsSummaryText(configs[0].value):
+  `Vereinbarte Grenzen: ${configs.map((e,i)=>`${i===0?`${fd(a)}–${fd(addDays(configs[i+1].date,-1))}`:`ab ${fd(e.date)}`}: ${alertsSummaryText(e.value).replace(/^Vereinbarte Grenzen: /,'')||'keine Grenzen vereinbart'}`).join(' · ')}`):'';
  const D=ds=>fill?(S.days[ds]||{}):{};
  const cell=(ds,f)=>{const v=D(ds)[f];return v==null?'':fmt(v,2)};
  const dailyRows=[
@@ -816,7 +877,7 @@ function sheetHTML(wn,fill){
   ['Ketone','mmol/l, nüchtern',ds=>cell(ds,'k')],
   ['Blutdruck','2× sys/dia, 1 Min. Abstand',ds=>{const d=D(ds);const slot=(s,di)=>s!=null?`${s}/${di??''}`:'<span class="empty">__/__</span>';return `<span class="bp2">${slot(d.sys1,d.dia1)}</span><span class="bp2">${slot(d.sys2,d.dia2)}</span>`}],
   ...S.settings.meds.filter(m=>medAppliesInRange(m,a,b)).map(m=>[esc(m.name),[...new Set(days.filter(ds=>medAppliesOnDate(m,ds)).map(ds=>medDoseOnDate(m,ds)))].map(esc).join(' → '),ds=>{if(!medAppliesOnDate(m,ds))return '<span class="empty">–</span>';const v=(D(ds).meds||{})[m.id];return v===true?'<b class="ok">✓</b>':v===false?'<b>✗</b>':'<span class="empty">□</span>'}]),
-  ['Kohlenhydrate',`g, Limit ${S.settings.carbGoal} g`,ds=>cell(ds,'c')]
+  ['Kohlenhydrate',`g, Limit ${goals.join(' → ')} g`,ds=>cell(ds,'c')]
  ];
  const befindenRows=[
   ['Energie','1 schlapp, 5 topfit',ds=>D(ds).en?`<b>${D(ds).en}</b>`:'<span class="empty">1 2 3 4 5</span>'],
@@ -834,7 +895,7 @@ function sheetHTML(wn,fill){
  </tbody></table>
  <div class="wk-wrap"><div class="wk-label">Einmal pro Woche</div><div class="wk"><div>Bauchumfang (cm)${wv('waist','')}</div><div>Ruhepuls Ø, Garmin${wv('rhr','')}</div><div>Schlaf Ø (h)${wv('sleep','')}</div><div>Stress Ø, Garmin${wv('stress','')}</div><div>Schritte Ø pro Tag${wv('steps','')}</div><div class="ruled">Wochennotiz<br>${esc(w.note||'')}</div></div></div>
  <p class="foot">Morgens messen, nach dem Aufstehen, vor Frühstück und Kaffee. Blutdruck sitzend nach 5 Minuten Ruhe. Einmal pro Woche ins Protokoll übertragen. · Keto-Protokoll v${VERSION}</p>
- ${hasAlertsSet()?`<p class="foot alert-foot">${esc(alertsSummaryText())}</p>`:''}</div>`;
+ ${alertFooter?`<p class="foot alert-foot">${esc(alertFooter)}</p>`:''}</div>`;
 }
 
 function generateTalkingPoints(){
@@ -872,7 +933,7 @@ function generateTalkingPoints(){
  });
 
  const over=[],under=[];
- daysInRange.forEach(([,d])=>{if(d.c!=null&&d.k!=null)(d.c>st.carbGoal?over:under).push(d.k)});
+ daysInRange.forEach(([ds,d])=>{if(d.c!=null&&d.k!=null)(d.c>carbGoalOnDate(ds)?over:under).push(d.k)});
  if(over.length>=5&&under.length>=5){
   const avgOver=over.reduce((s,v)=>s+v,0)/over.length,avgUnder=under.reduce((s,v)=>s+v,0)/under.length;
   if(Math.abs(avgOver-avgUnder)>=0.3)pts.push(`An Tagen über dem Kohlenhydrat-Limit lagen die Ketonwerte im Schnitt bei Ø ${fmt(avgOver,2)} mmol/l, an Tagen im Limit bei Ø ${fmt(avgUnder,2)} mmol/l.`);
@@ -929,9 +990,12 @@ function reportHTML(){
  const days=inR.map(e=>e[1]);
  const pl=days.filter(d=>d.plan),py=pl.filter(d=>d.plan==='y').length,pt=pl.filter(d=>d.plan==='t').length;
  const kd=days.filter(d=>d.k!=null),kin=kd.filter(d=>d.k>=0.5).length;
- const cd=days.filter(d=>d.c!=null),cOver=cd.filter(d=>d.c>st.carbGoal).length;
+ const cd=inR.filter(([,d])=>d.c!=null),cOver=cd.filter(([ds,d])=>d.c>carbGoalOnDate(ds)).length;
+ const goalHistory=carbGoalsInRange(st.start,end).filter((e,i,all)=>i===0||e.value!==all[i-1].value);
+ const alertHistory=coalescedAlertConfigsInRange(st.start,end);
+ const anyAlerts=alertHistory.some(e=>hasAlertsSet(e.value));
  const bpDays=days.filter(d=>d.sys1!=null||d.sys2!=null),bpTwo=bpDays.filter(d=>d.sys1!=null&&d.sys2!=null).length,bpOne=bpDays.length-bpTwo;
- const alertRows=hasAlertsSet()?inR.flatMap(([ds,d])=>checkAlerts(d).map(h=>({ds,...h}))).sort((a,b)=>a.ds<b.ds?-1:a.ds>b.ds?1:0):[];
+ const alertRows=anyAlerts?inR.flatMap(([ds,d])=>checkAlerts(d,ds).map(h=>({ds,...h}))).sort((a,b)=>a.ds<b.ds?-1:a.ds>b.ds?1:0):[];
  const months=Math.ceil(N()/30);
  const symC=SYMS.map(s=>{const c=Array(months).fill(0);inR.forEach(([ds,d])=>{if((d.sym||[]).includes(s))c[Math.floor(diffDays(st.start,ds)/30)]++});return [s,c]}).filter(([,c])=>c.some(Boolean));
  const labs=S.labs.filter(r=>r.base||r.end);
@@ -959,7 +1023,8 @@ function reportHTML(){
  <h2>Umsetzung</h2>
  <p>Im Plan geblieben: ${pl.length?`${py} Tage voll, ${pt} teilweise, ${pl.length-py-pt} nicht (von ${pl.length} Tagen mit Angabe)`:'keine Angaben'}.</p>
  <p>Ketonmessungen: ${kd.length?`${kin} von ${kd.length} bei 0,5 mmol/l oder höher, Mittelwert ${fmt(kd.reduce((s,d)=>s+d.k,0)/kd.length,2)} mmol/l`:'keine'}.</p>
- <p>Kohlenhydrate: ${cd.length?`Ø ${fmt(cd.reduce((s,d)=>s+d.c,0)/cd.length,0)} g/Tag, an ${cOver} von ${cd.length} Tagen über dem Limit`:'keine Angaben'}.</p>
+ <p>Kohlenhydrate: ${cd.length?`Ø ${fmt(cd.reduce((s,[,d])=>s+d.c,0)/cd.length,0)} g/Tag, an ${cOver} von ${cd.length} Tagen über dem jeweils gültigen Limit`:'keine Angaben'}.</p>
+ ${goalHistory.length>1?`<p class="small">Kohlenhydrat-Limit: ${goalHistory.map(e=>`${e.date?`ab ${fd(e.date,{day:'2-digit',month:'2-digit',year:'numeric'})}`:'Beginn des Zeitraums'}: ${fmt(e.value,0)} g/Tag`).join(' · ')}</p>`:''}
  <p>Blutdruck an ${bpTwo} Tagen mit zwei Messungen erfasst, an ${bpOne} Tagen mit einer.</p>
  <h2>Kurven</h2><div class="cg">${charts.join('')}</div>
  <h2>Laborwerte</h2>
@@ -970,8 +1035,8 @@ function reportHTML(){
  <h2>Beschwerden</h2>
  ${symC.length?`<table class="data"><thead><tr><th>Beschwerde</th>${Array.from({length:months},(_,i)=>`<th class="num">Tage ${i*30+1}–${Math.min((i+1)*30,N())}</th>`).join('')}</tr></thead><tbody>${symC.map(([s,c])=>`<tr><td>${s}</td>${c.map(x=>`<td class="num">${x||''}</td>`).join('')}</tr>`).join('')}</tbody></table>`:'<p>Keine Beschwerden notiert.</p>'}
  ${wn.length||dn.length?`<h2>Notizen</h2>${wn.map(n=>`<p><b>Woche ${n}:</b> ${esc(S.weeks[n].note)}</p>`).join('')}${dn.length?`<p class="small" style="margin-top:2mm">${dn.map(([ds,d])=>`<b>${fd(ds)}</b> ${esc(d.note)}`).join(' &nbsp; ')}</p>`:''}`:''}
- ${hasAlertsSet()?`<h2>Vereinbarte Grenzwerte</h2>
- <p>${esc(alertsSummaryText())}</p>
+ ${anyAlerts?`<h2>Vereinbarte Grenzwerte</h2>
+ <table class="data"><thead><tr><th>Gültig ab</th><th>Vereinbarte Grenzen / Vorgehen</th></tr></thead><tbody>${alertHistory.map(e=>`<tr><td>${e.date?fd(e.date,{day:'2-digit',month:'2-digit',year:'numeric'}):'zu Beginn des erfassten Zeitraums'}</td><td>${esc(alertsSummaryText(e.value)||'Keine Grenzen vereinbart')}</td></tr>`).join('')}</tbody></table>
  ${alertRows.length?`<table class="data"><thead><tr><th>Datum</th><th>Wert</th><th>Grenze überschritten</th></tr></thead><tbody>${alertRows.map(r=>`<tr><td>${fd(r.ds)}</td><td>${esc(r.label)}: ${fmt(r.value,0)} ${r.unit}</td><td>${r.dir==='min'?'min':'max'} ${fmt(r.limit,0)} ${r.unit}</td></tr>`).join('')}</tbody></table>`:'<p>Keine Überschreitung im Zeitraum.</p>'}`:''}
  <h2>Beobachtungen für das Gespräch</h2>
  <div class="callout">
@@ -1020,7 +1085,8 @@ function renderSet(){
  <div class="row"><label for="s_name"><b>Name</b><small>erscheint auf Blatt und Bericht</small></label><input id="s_name" data-s="name" value="${esc(st.name)}"></div>
  <div class="row"><label for="s_start"><b>Start</b></label><input id="s_start" type="date" data-s="start" value="${st.start}"></div>
  <div class="row"><label for="s_days"><b>Dauer</b><small>in Tagen</small></label><div class="inp" style="flex-wrap:wrap"><input id="s_days" data-s="days" inputmode="numeric" value="${st.days}" style="flex:1 1 60px"><span class="unit">Tage</span><button type="button" class="btn" data-extend="28" style="padding:5px 8px;font-size:.78rem;white-space:nowrap">+4 Wochen</button><button type="button" class="btn" data-extend="84" style="padding:5px 8px;font-size:.78rem;white-space:nowrap">+12 Wochen</button></div></div>
- <div class="row"><label for="s_carb"><b>Kohlenhydrat-Limit</b><small>wie mit dem Arzt abgesprochen</small></label><div class="inp"><input id="s_carb" data-s="carbGoal" inputmode="numeric" value="${st.carbGoal}"><span class="unit">g/Tag</span></div></div></div>
+ <div class="row"><label for="s_carb"><b>Kohlenhydrat-Limit</b><small>wie mit dem Arzt abgesprochen</small></label><div class="inp"><input id="s_carb" data-s="carbGoal" inputmode="numeric" value="${st.carbGoal}"><span class="unit">g/Tag</span></div></div>
+ <div class="row"><label for="s_carb_date"><b>Limit gilt ab</b></label><input id="s_carb_date" type="date" value="${today()}" min="${st.start}" max="${today()}"></div></div>
  <div class="panel"><h2>Neuer Durchgang</h2><p class="sub">Archiviert den aktuellen Zeitraum vollständig (Tageswerte, Wochenwerte, Labor, Dosisänderungen) und beginnt heute neu. Laufende Medikamente werden unverändert übernommen.</p>
  <div class="btns"><button type="button" class="btn primary" id="newRound">Neuen Durchgang starten</button></div></div>
  ${S.archive.length?`<div class="panel"><h2>Frühere Durchgänge</h2><p class="sub">Nur der Bericht lässt sich aus einem früheren Durchgang erneut drucken.</p>${archiveRows}</div>`:''}
@@ -1028,6 +1094,7 @@ function renderSet(){
  ${st.meds.map((m,i)=>{const locked=m.stoppedAt||medHasHistory(m.id);return `<tr><td><input data-mi="${i}" data-mk="name" value="${esc(m.name)}" aria-label="Name" ${locked?'readonly':''}>${locked?'<small class="sub">Historischer Eintrag</small>':''}${m.stoppedAt?`<small class="sub">Beendet ab ${fd(m.stoppedAt)}</small>`:''}</td><td style="width:100px"><input data-mi="${i}" data-mk="dose" value="${esc(m.dose)}" aria-label="Dosis" ${locked?'readonly':''}></td><td style="width:150px"><select data-mi="${i}" data-mk="category" aria-label="Kategorie" ${locked?'disabled':''}><option value="Medikament" ${m.category==='Medikament'?'selected':''}>Medikament</option><option value="Nahrungsergänzung" ${m.category==='Nahrungsergänzung'?'selected':''}>Nahrungsergänzung</option></select></td><td style="width:100px">${m.stoppedAt?'':`<button type="button" class="btn" data-mdose="${i}" style="padding:4px 8px;font-size:.85rem">Dosis geändert</button>`}</td><td style="width:36px">${m.stoppedAt?'':`<button type="button" class="btn" data-mdel="${i}" aria-label="${esc(m.name)} beenden oder entfernen" style="padding:4px 8px">✕</button>`}</td></tr>`}).join('')}
  </tbody></table><div class="btns"><button type="button" class="btn" id="medAdd">Medikament hinzufügen</button></div></div>
  <div class="panel"><h2>Mit dem Arzt vereinbarte Grenzwerte</h2><p class="sub">Nur Werte eintragen, die du mit deinem Arzt abgesprochen hast.</p>
+ <div class="row"><label for="al_date"><b>Grenzwerte gelten ab</b></label><input id="al_date" type="date" value="${today()}" min="${st.start}" max="${today()}"></div>
  ${alertRow('sysMin','sysMax','Blutdruck systolisch','mmHg',st.alerts)}
  ${alertRow('diaMin','diaMax','Blutdruck diastolisch','mmHg',st.alerts)}
  ${alertRow('gMin','gMax','Blutzucker','mg/dl',st.alerts)}
@@ -1040,17 +1107,53 @@ function renderSet(){
  <div class="panel"><h2>Alles löschen</h2><p class="sub">Entfernt alle Einträge aus diesem Browser.</p><div class="btns"><button type="button" class="btn danger" id="reset">Alle Daten löschen</button></div></div>
  <p class="sub" style="text-align:center">Keto-Protokoll v${VERSION}</p>`;
 }
+function settingsEffectiveDate(id){
+ const date=$('#'+id).value;
+ if(!validISODate(date)||date<S.settings.start||date>today()){
+  status('Datum muss im aktuellen Zeitraum bis heute liegen');
+  return null;
+ }
+ return date;
+}
+function showDatedSettingsValues(id,date){
+ if(id==='s_carb_date')$('#s_carb').value=vv(carbGoalOnDate(date));
+ else{
+  const al=alertsOnDate(date);
+  document.querySelectorAll('#v-set [data-al]').forEach(input=>{
+   input.value=input.dataset.al==='action'?al.action||'':vv(al[input.dataset.al]);
+  });
+ }
+}
+function refreshDatedSettings(){
+ const carbDate=$('#s_carb_date').value,alertDate=$('#al_date').value;
+ save();renderSet();
+ $('#s_carb_date').value=carbDate;$('#al_date').value=alertDate;
+ showDatedSettingsValues('s_carb_date',carbDate);
+ showDatedSettingsValues('al_date',alertDate);
+ renderHead();
+}
 $('#v-set').addEventListener('change',e=>{
  const t=e.target,k=t.dataset.s;
+ if(t.id==='s_carb_date'||t.id==='al_date'){
+  const date=settingsEffectiveDate(t.id);if(date)showDatedSettingsValues(t.id,date);
+  return;
+ }
  if(t.dataset.al){
+  const date=settingsEffectiveDate('al_date');if(!date)return;
   const ak=t.dataset.al;
-  if(ak==='action')S.settings.alerts.action=t.value.trim();
-  else{const n=num(t.value);S.settings.alerts[ak]=(t.value.trim()===''||n===null)?null:n}
-  save();renderHead();return;
+  const next={...alertsOnDate(date)};
+  if(ak==='action')next.action=t.value.trim();
+  else{const n=num(t.value);next[ak]=(t.value.trim()===''||n===null)?null:n}
+  upsertAlertHistory(date,next);syncCurrentSettings();refreshDatedSettings();return;
  }
  if(k){
-  if(k==='days'||k==='carbGoal'){const n=num(t.value);if(n==null||n<=0){status('Bitte eine Zahl eingeben');return}S.settings[k]=Math.round(n)}
-  else if(k==='start'){if(!t.value)return;S.settings.start=t.value}
+  if(k==='carbGoal'){
+   const n=num(t.value);if(n==null||Math.round(n)<=0){status('Bitte eine positive Zahl eingeben');return}
+   const date=settingsEffectiveDate('s_carb_date');if(!date)return;
+   upsertCarbGoalHistory(date,Math.round(n));syncCurrentSettings();refreshDatedSettings();return;
+  }
+  if(k==='days'){const n=num(t.value);if(n==null||n<=0){status('Bitte eine Zahl eingeben');return}S.settings[k]=Math.round(n)}
+  else if(k==='start'){if(!t.value)return;S.settings.start=t.value;$('#s_carb_date').min=t.value;$('#al_date').min=t.value}
   else S.settings[k]=t.value.trim();
   save();curWeek=Math.min(nWeeks(),Math.max(1,weekOf(today())));renderHead();return
  }
@@ -1106,8 +1209,13 @@ $('#v-set').addEventListener('click',e=>{
 function startNewRound(){
  const t=today(),end=addDays(S.settings.start,N()-1);
  S.archive.push({archivedAt:t,label:`${S.settings.start} – ${end}`,data:JSON.parse(JSON.stringify({settings:S.settings,days:S.days,weeks:S.weeks,labs:S.labs,labDates:S.labDates,doseChanges:S.doseChanges}))});
+ const goal=carbGoalOnDate(t),alerts={...alertsOnDate(t)};
  S.settings.meds=S.settings.meds.filter(m=>medAppliesOnDate(m,t));
  S.settings.start=t;
+ S.settings.carbGoal=goal;
+ S.settings.alerts=alerts;
+ S.settings.carbGoalHistory=[{date:t,value:goal}];
+ S.settings.alertHistory=[{date:t,value:{...alerts}}];
  S.days={};
  S.weeks={};
  S.doseChanges=[];
@@ -1136,7 +1244,7 @@ $('#importFile').addEventListener('change',e=>{
   if(!d.settings||!d.days)throw 0;
   if((d.dataVersion||0)>DATA_VERSION){status('Backup stammt aus einer neueren App-Version — bitte zuerst die App aktualisieren.');return}
   if(!confirm('Backup laden? Die aktuellen Daten in diesem Browser werden ersetzt.'))return;
-  S=migrate(d);save('Backup geladen');renderAll()
+  S=migrate(d);syncCurrentSettings();save('Backup geladen');renderAll()
  }catch(err){status('Datei ist kein gültiges Backup')}e.target.value=''};
  r.readAsText(file);
 });

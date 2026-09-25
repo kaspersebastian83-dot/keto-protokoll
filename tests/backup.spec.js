@@ -45,12 +45,46 @@ test.describe('Backup export/import', () => {
     const migrated = await page.evaluate(() => ({
       dataVersion: S.dataVersion, weeks: S.weeks, labDates: S.labDates, meds: S.settings.meds,
       doseChanges: S.doseChanges, archive: S.archive, refRead: S.refRead,
+      carbGoalHistory: S.settings.carbGoalHistory, alertHistory: S.settings.alertHistory,
     }));
 
     expect(migrated).toEqual({
-      dataVersion: 4, weeks: {}, labDates: { base: expect.any(String), end: '' }, meds: [],
+      dataVersion: 5, weeks: {}, labDates: { base: expect.any(String), end: '' }, meds: [],
       doseChanges: [], archive: [], refRead: {},
+      carbGoalHistory: [{ date: null, value: 50 }],
+      alertHistory: [{ date: null, value: blankState().settings.alerts }],
     });
     expect(errors).toEqual([]);
+  });
+
+  test('importing a v5 backup synchronizes stale live scalars without changing histories', async ({ page }) => {
+    await gotoApp(page);
+    const currentAlerts = { ...blankState().settings.alerts, gMax: 160, action: 'Current synthetic action' };
+    const goalHistory = [{ date: null, value: 50 }, { date: '2026-09-20', value: 30 }];
+    const alertHistory = [
+      { date: null, value: { ...blankState().settings.alerts, gMax: 180 } },
+      { date: '2026-09-20', value: currentAlerts },
+    ];
+    const backup = blankState({ settings: {
+      ...blankState().settings, carbGoal: 99,
+      alerts: { ...blankState().settings.alerts, gMax: 999, action: 'Stale action' },
+      carbGoalHistory: goalHistory, alertHistory,
+    } });
+    await seed(page, blankState());
+    await page.click('nav button[data-tab="set"]');
+    page.once('dialog', (d) => d.accept());
+    await page.setInputFiles('#importFile', {
+      name: 'stale-v5-backup.json', mimeType: 'application/json', buffer: Buffer.from(JSON.stringify(backup)),
+    });
+    await expect.poll(() => page.evaluate(() => S.settings.carbGoal)).toBe(30);
+    const result = await page.evaluate(() => ({
+      goal: S.settings.carbGoal, alerts: S.settings.alerts,
+      goalHistory: S.settings.carbGoalHistory, alertHistory: S.settings.alertHistory,
+      detached: S.settings.alerts !== S.settings.alertHistory.at(-1).value,
+      savedGoal: JSON.parse(localStorage.getItem('ketoProtokoll_v1')).settings.carbGoal,
+    }));
+    expect(result).toEqual({
+      goal: 30, alerts: currentAlerts, goalHistory, alertHistory, detached: true, savedGoal: 30,
+    });
   });
 });
