@@ -49,7 +49,7 @@ test.describe('Backup export/import', () => {
     }));
 
     expect(migrated).toEqual({
-      dataVersion: 5, weeks: {}, labDates: { base: expect.any(String), end: '' }, meds: [],
+      dataVersion: 6, weeks: {}, labDates: { base: expect.any(String), end: '' }, meds: [],
       doseChanges: [], archive: [], refRead: {},
       carbGoalHistory: [{ date: null, value: 50 }],
       alertHistory: [{ date: null, value: blankState().settings.alerts }],
@@ -65,11 +65,12 @@ test.describe('Backup export/import', () => {
       { date: null, value: { ...blankState().settings.alerts, gMax: 180 } },
       { date: '2026-09-20', value: currentAlerts },
     ];
-    const backup = blankState({ settings: {
+    const backup = blankState({ dataVersion: 5, settings: {
       ...blankState().settings, carbGoal: 99,
       alerts: { ...blankState().settings.alerts, gMax: 999, action: 'Stale action' },
       carbGoalHistory: goalHistory, alertHistory,
     } });
+    delete backup.settings.measurementSchedule;
     await seed(page, blankState());
     await page.click('nav button[data-tab="set"]');
     page.once('dialog', (d) => d.accept());

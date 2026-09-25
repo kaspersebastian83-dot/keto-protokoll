@@ -22,11 +22,12 @@ function today() {
 function blankState(overrides = {}) {
   const settings = { name: '', start: today(), days: 90, carbGoal: 50, questions: '', lastBackup: null, meds: [], backupWarnDismissed: null,
     alerts: { sysMin: null, sysMax: null, diaMin: null, diaMax: null, gMin: null, gMax: null, pMin: null, pMax: null, action: '' },
+    measurementSchedule: Object.fromEntries(['w', 'g', 'k', 'bp', 'p'].map(id => [id, { mode: 'daily', weekdays: [] }])),
     ...overrides.settings };
   if (!Object.prototype.hasOwnProperty.call(overrides.settings || {}, 'carbGoalHistory')) settings.carbGoalHistory = [{ date: null, value: settings.carbGoal }];
   if (!Object.prototype.hasOwnProperty.call(overrides.settings || {}, 'alertHistory')) settings.alertHistory = [{ date: null, value: { ...settings.alerts } }];
   return {
-    dataVersion: 5,
+    dataVersion: 6,
     days: {},
     weeks: {},
     labs: [],

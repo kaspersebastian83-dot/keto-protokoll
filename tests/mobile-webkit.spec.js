@@ -87,4 +87,20 @@ test.describe('iPhone-sized WebKit smoke checks', () => {
       weight: S.days[today()].w, recovery: localStorage.getItem(RECOVERY_KEY),
     }))).toEqual({ weight: 80, recovery: null });
   });
+
+  test('touch Settings schedule changes persist after reload', async ({ page }) => {
+    await gotoApp(page);
+    await seed(page, blankState());
+    await page.locator('nav button[data-tab="set"]').tap();
+    await page.locator('#ms_k').selectOption('weekdays');
+    const first = await page.evaluate(() => isoWeekday(today()));
+    const other = first === 7 ? 1 : first + 1;
+    await page.locator(`[data-ms-id="k"][data-ms-day="${other}"]`).tap();
+    const expected = [first, other].sort((a, b) => a - b);
+    await page.reload();
+    await page.locator('nav button[data-tab="set"]').tap();
+    await expect(page.locator('#ms_k')).toHaveValue('weekdays');
+    expect(await page.evaluate(() => S.settings.measurementSchedule.k.weekdays)).toEqual(expected);
+    await expect(page.locator(`[data-ms-id="k"][data-ms-day="${other}"]`)).toHaveAttribute('aria-pressed', 'true');
+  });
 });
