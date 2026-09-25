@@ -221,6 +221,7 @@ Important coverage includes:
 - version synchronization
 
 GitHub Actions runs tests on pushes and pull requests.
+CI covers Chromium, Playwright WebKit, and focused iPhone 13 emulation in mobile WebKit. Linux WebKit coverage does not replace testing on a physical iPhone or Safari on macOS.
 
 ## Development workflow
 
