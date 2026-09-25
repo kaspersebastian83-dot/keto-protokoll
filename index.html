@@ -67,6 +67,7 @@ textarea{min-height:64px;resize:vertical}
 .today-warning{display:block;color:var(--s2);font-size:.78rem}
 .today-extra>summary{font-size:1.05rem;font-weight:600;color:var(--ink)}
 .today-extra-count{font-size:.85rem;font-weight:400;color:var(--muted)}
+.weekly-checkin-card .btn{min-height:44px}
 :focus-visible{outline:2px solid var(--ink);outline-offset:2px}
 .scale,.seg{display:flex;gap:4px}
 .scale button,.seg button,.chips button,.btn{border:1px solid var(--line);background:var(--paper);border-radius:4px;font:inherit;color:var(--text);cursor:pointer;padding:8px 10px}
@@ -230,7 +231,7 @@ td.num,th.num{text-align:right}
 <script>
 const KEY='ketoProtokoll_v1';
 const RECOVERY_KEY='ketoProtokoll_recovery_v1';
-const VERSION='1.6.1'; // keep in sync with package.json, package-lock.json, and sw.js
+const VERSION='1.6.2'; // keep in sync with package.json, package-lock.json, and sw.js
 const SYMS=['Kopfschmerz','Müdigkeit','Muskelkrämpfe','Verdauung','Schwindel','Schlecht geschlafen','Heißhunger','Herzklopfen','Gereizt'];
 const DEFAULT_LABS=[['HbA1c','%'],['Glukose nüchtern','mg/dl'],['Gesamtcholesterin','mg/dl'],['LDL-Cholesterin','mg/dl'],['HDL-Cholesterin','mg/dl'],['Triglyzeride','mg/dl'],['Harnsäure','mg/dl'],['Kreatinin','mg/dl'],['eGFR','ml/min'],['GPT (ALT)','U/l'],['GOT (AST)','U/l'],['Gamma-GT','U/l'],['Natrium','mmol/l'],['Kalium','mmol/l'],['Magnesium','mmol/l'],['TSH','mU/l'],['CRP','mg/l']];
 const REFERENCES=[
@@ -767,6 +768,16 @@ function renderDay(){
  <div class="row wide"><label for="f_note"><b>Notiz</b><small>optional</small></label><textarea id="f_note" data-t="note">${esc(d.note)}</textarea></div>
  </div>
  ${quick?'':medHTML}`;
+ if(quick){
+  const dueWeek=weeklyCheckinDueWeek(curDate);
+  if(dueWeek!==null){
+   const {completed,total}=weeklyCheckinProgress(dueWeek);
+   h+=`<div class="panel weekly-checkin-card"><h2>Wochen-Check-in</h2>
+    <p class="sub">${dueWeek===weekOf(curDate)?'Zeit für den Wochen-Check-in.':`Woche ${dueWeek} nachtragen.`}</p>
+    <p>Woche ${dueWeek} · ${completed} von ${total} Wochenwerten erfasst</p>
+    <button type="button" class="btn" data-open-week="${dueWeek}">Wochen-Check-in öffnen</button></div>`;
+  }
+ }
  $('#v-day').innerHTML=h;
 }
 const BP_READING_FIELDS=['sys1','dia1','sys2','dia2'];
@@ -804,6 +815,7 @@ $('#v-day').addEventListener('click',e=>{
  if(b.id==='backupWarnExp'){doExportBackup();renderDay();renderHead();return}
  if(b.id==='backupWarnDismiss'){S.settings.backupWarnDismissed=today();save();renderDay();return}
  if(b.dataset.nav!=null){const n=+b.dataset.nav;curDate=n===0?today():addDays(curDate,n);renderDay();renderHead();return}
+ if(b.dataset.openWeek!=null){curWeek=+b.dataset.openWeek;show('week');return}
  const d=getDay(curDate);
  if(b.dataset.scale){const f=b.dataset.scale,v=+b.dataset.v;if(d[f]===v)delete d[f];else d[f]=v}
  else if(b.dataset.plan){d.plan=d.plan===b.dataset.plan?undefined:b.dataset.plan;if(!d.plan)delete d.plan}
@@ -815,6 +827,23 @@ $('#v-day').addEventListener('click',e=>{
 
 /* ---------- week ---------- */
 const WF=[['waist','Bauchumfang','auf Nabelhöhe, morgens','cm'],['rhr','Ruhepuls','Garmin, Ø der Woche','/min'],['sleep','Schlaf','Garmin, Ø pro Nacht','h'],['stress','Stress','Garmin, Ø der Woche','0–100'],['steps','Schritte','Garmin, Ø pro Tag','/Tag']];
+function weeklyCheckinProgress(n){
+ const w=S.weeks[n]||{};
+ return {completed:WF.filter(([field])=>w[field]!=null).length,total:WF.length};
+}
+function weeklyCheckinComplete(n){
+ const {completed,total}=weeklyCheckinProgress(n);
+ return completed===total;
+}
+function weeklyCheckinDueWeek(date=today()){
+ const dayIndex=diffDays(S.settings.start,date);
+ if(dayIndex<0||dayIndex>=N())return null;
+ const currentWeek=weekOf(date),periodEnd=addDays(S.settings.start,N()-1);
+ const weekEnd=weekRange(currentWeek)[1];
+ if(date===(weekEnd<periodEnd?weekEnd:periodEnd)&&!weeklyCheckinComplete(currentWeek))return currentWeek;
+ const previousWeek=currentWeek-1;
+ return previousWeek>=1&&!weeklyCheckinComplete(previousWeek)?previousWeek:null;
+}
 function renderWeek(){
  const w=S.weeks[curWeek]||{},[a,b]=weekRange(curWeek);
  const meds=S.settings.meds.filter(m=>medAppliesInRange(m,a,b));
