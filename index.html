@@ -56,18 +56,22 @@ textarea{min-height:64px;resize:vertical}
 .bp-line b{flex:0 0 auto;min-width:150px;font-weight:500;font-size:.92rem}
 .bp-line .inp{flex:1 1 170px}
 .bp-avg{display:block;color:var(--muted);font-size:.85rem;margin-top:4px}
-.today-progress{color:var(--muted);font-size:.9rem;margin:4px 0 8px}
+.today-progress{color:var(--muted);font-size:.9rem;margin:6px 0 12px}
 .today-measurement{border-bottom:1px dashed var(--line)}
 .today-measurement:last-child{border-bottom:0}
 .today-measurement .row{border-bottom:0}
-.today-complete>summary,.today-extra>summary{min-height:44px;padding:9px 2px;cursor:pointer}
+.today-complete>summary,.today-extra>summary{min-height:44px;padding:10px 2px;cursor:pointer;overflow-wrap:anywhere}
 .today-complete>summary{color:var(--text)}
-.today-value{margin-left:8px;font-weight:600}
-.today-action{margin-left:8px;color:var(--muted);font-size:.85rem}
-.today-warning{display:block;color:var(--s2);font-size:.78rem}
+.today-summary-main{display:inline-flex;flex-wrap:wrap;align-items:baseline;column-gap:8px;max-width:100%;vertical-align:top}
+.today-value{font-weight:600}
+.today-action{color:var(--muted);font-size:.85rem}
+.today-warning{display:block;color:var(--s2);font-size:.78rem;margin-top:4px}
 .today-extra>summary{font-size:1.05rem;font-weight:600;color:var(--ink)}
 .today-extra-count{font-size:.85rem;font-weight:400;color:var(--muted)}
+.weekly-checkin-card p:not(.sub){margin:10px 0 12px}
 .weekly-checkin-card .btn{min-height:44px}
+#v-day input,#v-day .scale button,#v-day .seg button,#v-day .chips button,#v-day .datebar .btn,#v-week input,#v-week select,#v-week .datebar .btn{min-height:44px}
+#v-week #wsel{height:44px}
 :focus-visible{outline:2px solid var(--ink);outline-offset:2px}
 .scale,.seg{display:flex;gap:4px}
 .scale button,.seg button,.chips button,.btn{border:1px solid var(--line);background:var(--paper);border-radius:4px;font:inherit;color:var(--text);cursor:pointer;padding:8px 10px}
@@ -116,6 +120,16 @@ td.num,th.num{text-align:right}
 #status.show{opacity:1}
 [hidden]{display:none!important}
 @media (max-width:540px){.row{grid-template-columns:1fr 140px}.strip{grid-template-columns:repeat(15,1fr)}header h1{font-size:1.45rem}}
+@media (max-width:450px){
+ #v-day .row:not(.wide),#v-week .row:not(.wide){grid-template-columns:minmax(0,1fr);gap:5px}
+ #v-day .row .inp,#v-week .row .inp{width:100%;min-width:0}
+ #v-day .scale button,#v-day .seg button{min-width:0}
+ #v-day .bp-line{gap:5px;width:100%;min-width:0}
+ #v-day .bp-line b{flex:1 1 100%;min-width:0}
+ #v-day .bp-line .inp{flex:1 1 100%}
+ #v-day .bp-line input{flex:1 1 0;min-width:0}
+ #v-day .weekly-checkin-card .btn{width:100%}
+}
 @media (prefers-reduced-motion:reduce){*{transition:none!important}}
 #print{display:none}
 
@@ -231,7 +245,7 @@ td.num,th.num{text-align:right}
 <script>
 const KEY='ketoProtokoll_v1';
 const RECOVERY_KEY='ketoProtokoll_recovery_v1';
-const VERSION='1.6.2'; // keep in sync with package.json, package-lock.json, and sw.js
+const VERSION='1.6.3'; // keep in sync with package.json, package-lock.json, and sw.js
 const SYMS=['Kopfschmerz','Müdigkeit','Muskelkrämpfe','Verdauung','Schwindel','Schlecht geschlafen','Heißhunger','Herzklopfen','Gereizt'];
 const DEFAULT_LABS=[['HbA1c','%'],['Glukose nüchtern','mg/dl'],['Gesamtcholesterin','mg/dl'],['LDL-Cholesterin','mg/dl'],['HDL-Cholesterin','mg/dl'],['Triglyzeride','mg/dl'],['Harnsäure','mg/dl'],['Kreatinin','mg/dl'],['eGFR','ml/min'],['GPT (ALT)','U/l'],['GOT (AST)','U/l'],['Gamma-GT','U/l'],['Natrium','mmol/l'],['Kalium','mmol/l'],['Magnesium','mmol/l'],['TSH','mU/l'],['CRP','mg/l']];
 const REFERENCES=[
@@ -715,11 +729,13 @@ function todayMeasurementBody(id,d){
  const input=measurementInputHTML(id,d);
  if(!measurementComplete(id,d))return input;
  const warning=id==='bp'?[bpReadingMsg(d.sys1,d.dia1),bpReadingMsg(d.sys2,d.dia2),bpDiffMsg(d)].filter(Boolean).join(' · '):plausMsg(id,d);
- return `<details class="today-complete"><summary>${MEASUREMENT_LABELS[id]} <span class="today-value">${measurementSummary(id,d)}</span><span class="today-action">Ändern</span>${warning?`<span class="today-warning">${esc(warning)}</span>`:''}</summary>${input}</details>`;
+ return `<details class="today-complete"><summary><span class="today-summary-main"><span>${MEASUREMENT_LABELS[id]}</span><span class="today-value">${measurementSummary(id,d)}</span><span class="today-action">Ändern</span></span>${warning?`<span class="today-warning">${esc(warning)}</span>`:''}</summary>${input}</details>`;
 }
 function todayProgressText(d,due){
- return due.length?`Vorgesehene Messungen: ${due.filter(id=>measurementComplete(id,d)).length} von ${due.length} erfasst`:
-  'Laut deinem Messplan ist heute keine Messung vorgesehen.';
+ if(!due.length)return 'Laut deinem Messplan ist heute keine Messung vorgesehen.';
+ const completed=due.filter(id=>measurementComplete(id,d)).length;
+ return completed===due.length?`Vorgesehene Messungen vollständig erfasst · ${completed} von ${due.length}`:
+  `Vorgesehene Messungen: ${completed} von ${due.length} erfasst`;
 }
 function extraSummaryText(d,extra){
  const count=extra.filter(id=>measurementHasData(id,d)).length;

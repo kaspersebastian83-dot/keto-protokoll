@@ -141,4 +141,86 @@ test.describe('iPhone-sized WebKit smoke checks', () => {
     await expect(page.locator('#w_waist')).toHaveValue('84');
     expect(await page.evaluate(() => document.documentElement.scrollWidth - document.documentElement.clientWidth)).toBeLessThanOrEqual(2);
   });
+
+  test('Today rows stack and common controls meet phone touch targets', async ({ page }) => {
+    await gotoApp(page);
+    await seed(page, blankState());
+    const row = page.locator('#v-day #todayDue .row').first();
+    const label = await row.locator('label').boundingBox();
+    const control = await row.locator('.inp').boundingBox();
+    expect(control.y).toBeGreaterThanOrEqual(label.y + label.height - 1);
+    expect(control.width).toBeGreaterThan(220);
+    for (const selector of ['#f_w', '#dpick', '[data-scale="en"][data-v="1"]',
+      '[data-plan="y"]', '[data-sym]', '[data-nav="-1"]']) {
+      const box = await page.locator(`#v-day ${selector}`).first().boundingBox();
+      expect(box.height, selector).toBeGreaterThanOrEqual(44);
+    }
+    expect(await page.evaluate(() => document.documentElement.scrollWidth - document.documentElement.clientWidth)).toBeLessThanOrEqual(2);
+  });
+
+  test('completed summary wraps safely and its original input stays usable', async ({ page }) => {
+    await gotoApp(page);
+    await seed(page, blankState({ days: { [today()]: { w: 820 } } }));
+    const summary = page.locator('[data-today-measurement="w"] summary');
+    const summaryBox = await summary.boundingBox();
+    expect(summaryBox.height).toBeGreaterThanOrEqual(44);
+    for (const selector of ['.today-summary-main > span:first-child', '.today-value', '.today-action', '.today-warning'])
+      await expect(summary.locator(selector)).toBeVisible();
+    expect(await summary.evaluate(el => [...el.querySelectorAll('.today-summary-main > span')]
+      .every(child => child.getBoundingClientRect().right <= el.getBoundingClientRect().right + 1))).toBe(true);
+    await summary.tap();
+    await expect(page.locator('#f_w')).toBeVisible();
+    expect((await page.locator('#f_w').boundingBox()).height).toBeGreaterThanOrEqual(44);
+    expect(await page.evaluate(() => document.documentElement.scrollWidth - document.documentElement.clientWidth)).toBeLessThanOrEqual(2);
+  });
+
+  test('BP labels and pairs fit while four-reading entry still derives the average', async ({ page }) => {
+    await gotoApp(page);
+    await seed(page, blankState());
+    const line = page.locator('#v-day .bp-line').first();
+    const label = await line.locator('b').boundingBox();
+    const pair = await line.locator('.inp').boundingBox();
+    expect(pair.y).toBeGreaterThanOrEqual(label.y + label.height - 1);
+    for (const selector of ['#f_sys1', 'input[data-f="dia1"]', '#f_sys2', 'input[data-f="dia2"]']) {
+      const box = await page.locator(selector).boundingBox();
+      expect(box.height, selector).toBeGreaterThanOrEqual(44);
+      expect(box.x + box.width).toBeLessThanOrEqual(page.viewportSize().width + 1);
+    }
+    for (const [selector, value] of [['#f_sys1', '128'], ['input[data-f="dia1"]', '82'],
+      ['#f_sys2', '126'], ['input[data-f="dia2"]', '78']]) {
+      await page.locator(selector).fill(value);
+      await page.locator(selector).blur();
+    }
+    await expect(page.locator('[data-today-measurement="bp"] summary')).toContainText('127/80 mmHg');
+    expect(await page.evaluate(() => ({ sys: S.days[today()].sys, dia: S.days[today()].dia })))
+      .toEqual({ sys: 127, dia: 80 });
+    expect(await page.evaluate(() => document.documentElement.scrollWidth - document.documentElement.clientWidth)).toBeLessThanOrEqual(2);
+  });
+
+  test('Week rows stack and its fields and navigation stay touchable', async ({ page }) => {
+    await gotoApp(page);
+    await seed(page, blankState());
+    await page.locator('nav button[data-tab="week"]').tap();
+    const row = page.locator('#v-week .row').first();
+    const label = await row.locator('label').boundingBox();
+    const control = await row.locator('.inp').boundingBox();
+    expect(control.y).toBeGreaterThanOrEqual(label.y + label.height - 1);
+    for (const selector of ['#w_waist', '#w_note', '#wsel', '[data-wnav="-1"]', '[data-wnav="1"]'])
+      expect((await page.locator(`#v-week ${selector}`).boundingBox()).height, selector).toBeGreaterThanOrEqual(44);
+    expect(await page.evaluate(() => document.documentElement.scrollWidth - document.documentElement.clientWidth)).toBeLessThanOrEqual(2);
+  });
+
+  test('due weekly card remains neutral, full-width and opens the due week by touch', async ({ page }) => {
+    await gotoApp(page);
+    await seed(page, blankState({ settings: { start: addDays(today(), -6), days: 14 } }));
+    const card = page.locator('.weekly-checkin-card');
+    await expect(card).toContainText('Woche 1 · 0 von 5 Wochenwerten erfasst');
+    const button = card.getByRole('button', { name: 'Wochen-Check-in öffnen' });
+    const box = await button.boundingBox();
+    expect(box.height).toBeGreaterThanOrEqual(44);
+    expect(box.width).toBeGreaterThan(220);
+    expect(await page.evaluate(() => document.documentElement.scrollWidth - document.documentElement.clientWidth)).toBeLessThanOrEqual(2);
+    await button.tap();
+    await expect(page.locator('#wsel')).toHaveValue('1');
+  });
 });
