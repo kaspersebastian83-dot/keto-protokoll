@@ -1,6 +1,11 @@
 const { test, expect } = require('@playwright/test');
 const { gotoApp, seed, blankState, today, addDays } = require('./helpers');
 
+async function openCompletedBP(page) {
+  const summary = page.locator('[data-today-measurement="bp"] summary');
+  if (await summary.count()) await summary.click();
+}
+
 test.describe('Two blood pressure readings, averaged', () => {
   test('derived sys/dia average two readings, or fall back to whichever single reading exists', async ({ page }) => {
     await gotoApp(page);
@@ -25,6 +30,7 @@ test.describe('Two blood pressure readings, averaged', () => {
     expect(d.dia).toBe(Math.round((80 + 85) / 2)); // 83 (82.5 rounds up)
 
     // Clearing reading 1 falls back to reading 2 alone.
+    await openCompletedBP(page);
     await page.fill('#f_sys1', '');
     await page.locator('#f_sys1').blur();
     await page.fill('input[data-f="dia1"]', '');
@@ -51,6 +57,7 @@ test.describe('Two blood pressure readings, averaged', () => {
     await page.fill('input[data-f="dia2"]', '82');
     await page.locator('input[data-f="dia2"]').blur();
 
+    await openCompletedBP(page);
     await expect(page.locator('#bpAvg')).toBeVisible();
     await expect(page.locator('#bpAvg')).toHaveText('Ø 124/81');
   });
@@ -72,6 +79,7 @@ test.describe('Two blood pressure readings, averaged', () => {
     await page.locator('#f_sys2').blur();
     await page.fill('input[data-f="dia2"]', '90');
     await page.locator('input[data-f="dia2"]').blur();
+    await openCompletedBP(page);
     await expect(page.locator('#hint_bp2')).toBeVisible();
 
     // Both readings still saved exactly as typed — hints are advisory only.
@@ -95,6 +103,7 @@ test.describe('Two blood pressure readings, averaged', () => {
     await page.fill('input[data-f="dia2"]', '80');
     await page.locator('input[data-f="dia2"]').blur();
 
+    await openCompletedBP(page);
     await expect(page.locator('#hint_bpdiff')).toBeVisible();
     await expect(page.locator('#hint_bpdiff')).toHaveText(/weichen stark ab/);
     const d = await page.evaluate(() => S.days[today()]);

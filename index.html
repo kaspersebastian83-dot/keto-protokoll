@@ -56,6 +56,17 @@ textarea{min-height:64px;resize:vertical}
 .bp-line b{flex:0 0 auto;min-width:150px;font-weight:500;font-size:.92rem}
 .bp-line .inp{flex:1 1 170px}
 .bp-avg{display:block;color:var(--muted);font-size:.85rem;margin-top:4px}
+.today-progress{color:var(--muted);font-size:.9rem;margin:4px 0 8px}
+.today-measurement{border-bottom:1px dashed var(--line)}
+.today-measurement:last-child{border-bottom:0}
+.today-measurement .row{border-bottom:0}
+.today-complete>summary,.today-extra>summary{min-height:44px;padding:9px 2px;cursor:pointer}
+.today-complete>summary{color:var(--text)}
+.today-value{margin-left:8px;font-weight:600}
+.today-action{margin-left:8px;color:var(--muted);font-size:.85rem}
+.today-warning{display:block;color:var(--s2);font-size:.78rem}
+.today-extra>summary{font-size:1.05rem;font-weight:600;color:var(--ink)}
+.today-extra-count{font-size:.85rem;font-weight:400;color:var(--muted)}
 :focus-visible{outline:2px solid var(--ink);outline-offset:2px}
 .scale,.seg{display:flex;gap:4px}
 .scale button,.seg button,.chips button,.btn{border:1px solid var(--line);background:var(--paper);border-radius:4px;font:inherit;color:var(--text);cursor:pointer;padding:8px 10px}
@@ -219,7 +230,7 @@ td.num,th.num{text-align:right}
 <script>
 const KEY='ketoProtokoll_v1';
 const RECOVERY_KEY='ketoProtokoll_recovery_v1';
-const VERSION='1.6.0'; // keep in sync with package.json, package-lock.json, and sw.js
+const VERSION='1.6.1'; // keep in sync with package.json, package-lock.json, and sw.js
 const SYMS=['Kopfschmerz','Müdigkeit','Muskelkrämpfe','Verdauung','Schwindel','Schlecht geschlafen','Heißhunger','Herzklopfen','Gereizt'];
 const DEFAULT_LABS=[['HbA1c','%'],['Glukose nüchtern','mg/dl'],['Gesamtcholesterin','mg/dl'],['LDL-Cholesterin','mg/dl'],['HDL-Cholesterin','mg/dl'],['Triglyzeride','mg/dl'],['Harnsäure','mg/dl'],['Kreatinin','mg/dl'],['eGFR','ml/min'],['GPT (ALT)','U/l'],['GOT (AST)','U/l'],['Gamma-GT','U/l'],['Natrium','mmol/l'],['Kalium','mmol/l'],['Magnesium','mmol/l'],['TSH','mU/l'],['CRP','mg/l']];
 const REFERENCES=[
@@ -679,21 +690,75 @@ function updateAlertPanel(d){
   else $('#v-day').insertAdjacentHTML('afterbegin',alertPanelHTML(hits,curDate));
  }else if(existing)existing.remove();
 }
+function measurementComplete(id,d){
+ if(id==='bp')return BP_READING_FIELDS.every(f=>d[f]!=null);
+ return MEASUREMENT_IDS.includes(id)&&d[id]!=null;
+}
+function measurementHasData(id,d){
+ if(id==='bp')return [...BP_READING_FIELDS,'sys','dia'].some(f=>d[f]!=null);
+ return MEASUREMENT_IDS.includes(id)&&d[id]!=null;
+}
+function measurementSummary(id,d){
+ if(id==='bp')return `${fmt(d.sys,0)}/${fmt(d.dia,0)} mmHg`;
+ const units={w:'kg',g:'mg/dl',k:'mmol/l',p:'/min'};
+ return `${fmt(d[id],id==='k'?2:id==='w'?1:0)} ${units[id]}`;
+}
+function measurementInputHTML(id,d){
+ if(id==='bp')return bpRowHTML(d);
+ const rows={w:['Gewicht','nach dem Aufstehen','kg','decimal'],g:['Blutzucker','vor Frühstück und Kaffee','mg/dl','numeric'],
+  k:['Ketone','Blutmessung','mmol/l','decimal'],p:['Puls','optional, vom Blutdruckgerät','/min','numeric']};
+ const [label,hint,unit,mode]=rows[id];
+ return numRow(id,label,hint,unit,d,mode,plausMsg(id,d));
+}
+function todayMeasurementBody(id,d){
+ const input=measurementInputHTML(id,d);
+ if(!measurementComplete(id,d))return input;
+ const warning=id==='bp'?[bpReadingMsg(d.sys1,d.dia1),bpReadingMsg(d.sys2,d.dia2),bpDiffMsg(d)].filter(Boolean).join(' · '):plausMsg(id,d);
+ return `<details class="today-complete"><summary>${MEASUREMENT_LABELS[id]} <span class="today-value">${measurementSummary(id,d)}</span><span class="today-action">Ändern</span>${warning?`<span class="today-warning">${esc(warning)}</span>`:''}</summary>${input}</details>`;
+}
+function todayProgressText(d,due){
+ return due.length?`Vorgesehene Messungen: ${due.filter(id=>measurementComplete(id,d)).length} von ${due.length} erfasst`:
+  'Laut deinem Messplan ist heute keine Messung vorgesehen.';
+}
+function extraSummaryText(d,extra){
+ const count=extra.filter(id=>measurementHasData(id,d)).length;
+ return `Weitere Werte eintragen${count?` <span class="today-extra-count">· ${count} eingetragen</span>`:''}`;
+}
+function updateTodayProgress(d){
+ const progress=$('#todayProgress');if(!progress)return;
+ const due=dueMeasurementIds(curDate),extra=MEASUREMENT_IDS.filter(id=>!due.includes(id));
+ progress.textContent=todayProgressText(d,due);
+ const summary=$('#todayExtraSummary');if(summary)summary.innerHTML=extraSummaryText(d,extra);
+}
+const invalidMeasurementDrafts=new WeakSet();
+function measurementHasInvalidDraft(block){
+ return [...block.querySelectorAll('input[data-f]')].some(input=>invalidMeasurementDrafts.has(input));
+}
+function syncTodayMeasurement(block){
+ if(!block.isConnected||block.contains(document.activeElement)||curDate!==today())return;
+ if(measurementHasInvalidDraft(block))return;
+ const id=block.dataset.todayMeasurement,d=S.days[curDate]||{};
+ const compact=!!block.querySelector(':scope > details.today-complete');
+ if(measurementComplete(id,d)||compact)block.innerHTML=todayMeasurementBody(id,d);
+}
 function renderDay(){
  const d=S.days[curDate]||{},i=diffDays(S.settings.start,curDate),inR=i>=0&&i<N();
+ const quick=curDate===today()&&inR;
  const meds=S.settings.meds.filter(m=>medAppliesOnDate(m,curDate));
  const showBackupWarn=backupUrgency()==='critical'&&S.settings.backupWarnDismissed!==today();
  const alertHits=checkAlerts(d,curDate);
  let h=`${alertHits.length?alertPanelHTML(alertHits,curDate):''}${showBackupWarn?backupWarnHTML():''}<div class="datebar"><button type="button" class="btn" data-nav="-1" aria-label="Vorheriger Tag">‹</button><input type="date" id="dpick" value="${curDate}" aria-label="Datum"><button type="button" class="btn" data-nav="1" aria-label="Nächster Tag">›</button>${curDate!==today()?'<button type="button" class="btn" data-nav="0">Heute</button>':''}</div>
- <p class="sub" style="margin-bottom:12px">${fd(curDate,{weekday:'long',day:'numeric',month:'long'})}${inR?`, Tag ${i+1}`:', außerhalb des Zeitraums'}</p>
- <div class="panel"><h2>Morgens, nüchtern</h2>
- ${numRow('w','Gewicht','nach dem Aufstehen','kg',d,'decimal',plausMsg('w',d))}
- ${numRow('g','Blutzucker','vor Frühstück und Kaffee','mg/dl',d,'numeric',plausMsg('g',d))}
- ${numRow('k','Ketone','Blutmessung','mmol/l',d,'decimal',plausMsg('k',d))}
- ${bpRowHTML(d)}
- ${numRow('p','Puls','optional, vom Blutdruckgerät','/min',d,'numeric',plausMsg('p',d))}
- </div>
- <div class="panel"><h2>Über den Tag</h2>
+ <p class="sub" style="margin-bottom:12px">${fd(curDate,{weekday:'long',day:'numeric',month:'long'})}${inR?`, Tag ${i+1}`:', außerhalb des Zeitraums'}</p>`;
+ if(quick){
+  const due=dueMeasurementIds(curDate),extra=MEASUREMENT_IDS.filter(id=>!due.includes(id));
+  h+=`<div class="panel" id="todayDue"><h2>Heute vorgesehen</h2><p class="today-progress" id="todayProgress" aria-live="polite" aria-atomic="true">${todayProgressText(d,due)}</p>
+  ${due.map(id=>`<div class="today-measurement" data-today-measurement="${id}">${todayMeasurementBody(id,d)}</div>`).join('')}</div>
+  ${extra.length?`<details class="panel today-extra" id="todayExtra"><summary id="todayExtraSummary">${extraSummaryText(d,extra)}</summary>${extra.map(id=>measurementInputHTML(id,d)).join('')}</details>`:''}`;
+ }else{
+  h+=`<div class="panel"><h2>Morgens, nüchtern</h2>${MEASUREMENT_IDS.map(id=>measurementInputHTML(id,d)).join('')}</div>`;
+ }
+ const medHTML=meds.length?`<div class="panel"><h2>Medikamente</h2>${meds.map(m=>{const v=(d.meds||{})[m.id];return `<div class="row"><div class="lbl"><b>${esc(m.name)}</b><small>${esc(medDoseOnDate(m,curDate))}${m.category?' · '+esc(m.category):''}</small></div><div class="seg" role="group" aria-label="${esc(m.name)}">${[['1','Genommen'],['0','Nicht genommen']].map(([k,l])=>{const on=(k==='1'&&v===true)||(k==='0'&&v===false);return `<button type="button" data-med="${m.id}" data-mv="${k}" class="${on?'on':''}" aria-pressed="${on}">${l}</button>`}).join('')}</div></div>`}).join('')}</div>`:'';
+ h+=`${quick?medHTML:''}<div class="panel"><h2>Über den Tag</h2>
  ${numRow('c','Kohlenhydrate',`grob geschätzt, Limit ${carbGoalOnDate(curDate)} g`,'g',d,'numeric',plausMsg('c',d))}
  ${scaleRow('en','Energie','1 schlapp, 5 topfit',d)}
  ${scaleRow('hu','Hunger','1 kaum, 5 stark',d)}
@@ -701,7 +766,7 @@ function renderDay(){
  <div class="row wide"><div class="lbl"><b>Beschwerden</b><small>antippen, was heute auffiel</small></div><div class="chips">${SYMS.map(s=>{const on=(d.sym||[]).includes(s);return `<button type="button" data-sym="${esc(s)}" class="${on?'on':''}" aria-pressed="${on}">${s}</button>`}).join('')}</div></div>
  <div class="row wide"><label for="f_note"><b>Notiz</b><small>optional</small></label><textarea id="f_note" data-t="note">${esc(d.note)}</textarea></div>
  </div>
- ${meds.length?`<div class="panel"><h2>Medikamente</h2>${meds.map(m=>{const v=(d.meds||{})[m.id];return `<div class="row"><div class="lbl"><b>${esc(m.name)}</b><small>${esc(medDoseOnDate(m,curDate))}${m.category?' · '+esc(m.category):''}</small></div><div class="seg" role="group" aria-label="${esc(m.name)}">${[['1','Genommen'],['0','Nicht genommen']].map(([k,l])=>{const on=(k==='1'&&v===true)||(k==='0'&&v===false);return `<button type="button" data-med="${m.id}" data-mv="${k}" class="${on?'on':''}" aria-pressed="${on}">${l}</button>`}).join('')}</div></div>`}).join('')}</div>`:''}`;
+ ${quick?'':medHTML}`;
  $('#v-day').innerHTML=h;
 }
 const BP_READING_FIELDS=['sys1','dia1','sys2','dia2'];
@@ -710,7 +775,11 @@ $('#v-day').addEventListener('change',e=>{
  if(t.id==='dpick'){if(t.value){curDate=t.value;renderDay();renderHead()}return}
  let n;
  if(t.dataset.f){
-  n=num(t.value);if(t.value.trim()!==''&&n===null){status('Bitte eine Zahl eingeben');return}
+  n=num(t.value);if(t.value.trim()!==''&&n===null){
+   invalidMeasurementDrafts.add(t);
+   status('Bitte eine Zahl eingeben');return;
+  }
+  invalidMeasurementDrafts.delete(t);
  }
  const d=getDay(curDate);
  if(t.dataset.f){
@@ -723,7 +792,12 @@ $('#v-day').addEventListener('change',e=>{
   if(BP_READING_FIELDS.includes(t.dataset.f))updateBPUI(d);
   else updateHint(t.dataset.f,d);
   updateAlertPanel(d);
+  updateTodayProgress(d);
  }
+});
+$('#v-day').addEventListener('focusout',e=>{
+ const block=e.target.closest('[data-today-measurement]');
+ if(block)queueMicrotask(()=>syncTodayMeasurement(block));
 });
 $('#v-day').addEventListener('click',e=>{
  const b=e.target.closest('button');if(!b)return;

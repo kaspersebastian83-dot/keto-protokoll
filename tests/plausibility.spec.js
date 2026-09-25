@@ -9,6 +9,8 @@ test.describe('Plausibility hints', () => {
     await page.fill('#f_w', '820'); // obviously implausible weight
     await page.locator('#f_w').blur();
 
+    await expect(page.locator('[data-today-measurement="w"] .today-warning')).toContainText('Ungewöhnlicher Wert');
+    await page.locator('[data-today-measurement="w"] summary').click();
     await expect(page.locator('#hint_w')).toBeVisible();
     const saved = await page.evaluate(() => S.days[today()].w);
     expect(saved).toBe(820); // saved exactly as typed despite being flagged
@@ -20,10 +22,13 @@ test.describe('Plausibility hints', () => {
 
     await page.fill('#f_w', '820');
     await page.locator('#f_w').blur();
+    await expect(page.locator('[data-today-measurement="w"] .today-warning')).toBeVisible();
+    await page.locator('[data-today-measurement="w"] summary').click();
     await expect(page.locator('#hint_w')).toBeVisible();
 
     await page.fill('#f_w', '82');
     await page.locator('#f_w').blur();
+    await expect(page.locator('[data-today-measurement="w"] .today-warning')).toHaveCount(0);
     await expect(page.locator('#hint_w')).toBeHidden();
   });
 
@@ -33,6 +38,8 @@ test.describe('Plausibility hints', () => {
 
     await page.fill('#f_g', '9'); // far below plausible glucose range
     await page.locator('#f_g').blur();
+    await expect(page.locator('[data-today-measurement="g"] .today-warning')).toBeVisible();
+    await page.locator('[data-today-measurement="g"] summary').click();
     await expect(page.locator('#hint_g')).toBeVisible();
 
     await page.fill('#f_g', '');
@@ -66,6 +73,8 @@ test.describe('Plausibility hints', () => {
     await page.fill('#f_w', '90'); // 10kg jump in one day
     await page.locator('#f_w').blur();
 
+    await expect(page.locator('[data-today-measurement="w"] .today-warning')).toContainText('Sprung');
+    await page.locator('[data-today-measurement="w"] summary').click();
     await expect(page.locator('#hint_w')).toBeVisible();
     await expect(page.locator('#hint_w')).toHaveText(/Sprung/);
   });

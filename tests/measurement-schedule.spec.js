@@ -205,12 +205,16 @@ test.describe('Measurement schedule foundation', () => {
       .toEqual({ mode: 'optional', weekdays: [] });
   });
 
-  test('Today keeps every morning control even when all measurements are optional', async ({ page }) => {
+  test('Today keeps all optional morning controls accessible under Weitere Werte', async ({ page }) => {
     const optional = Object.fromEntries(ids.map(id => [id, { mode: 'optional', weekdays: [] }]));
     await gotoApp(page);
     await seed(page, scheduleState(optional));
-    for (const selector of ['#f_w', '#f_g', '#f_k', '#f_sys1', '#f_sys2', '#f_p'])
-      await expect(page.locator(selector)).toBeVisible();
     expect(await page.evaluate(() => dueMeasurementIds(today()))).toEqual([]);
+    await expect(page.locator('#todayExtraSummary')).toContainText('Weitere Werte eintragen');
+    for (const selector of ['#f_w', '#f_g', '#f_k', '#f_sys1', '#f_sys2', '#f_p'])
+      await expect(page.locator(`#todayExtra ${selector}`)).toBeHidden();
+    await page.locator('#todayExtraSummary').click();
+    for (const selector of ['#f_w', '#f_g', '#f_k', '#f_sys1', '#f_sys2', '#f_p'])
+      await expect(page.locator(`#todayExtra ${selector}`)).toBeVisible();
   });
 });
