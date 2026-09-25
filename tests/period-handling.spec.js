@@ -26,7 +26,7 @@ test.describe('Period handling', () => {
       live: { name: S.settings.name, alerts: S.settings.alerts, day: S.days[today()] },
     }));
     expect(result.metadata).toEqual({ label: 'Legacy period', archivedAt: '2026-02-01' });
-    expect(result.archived.dataVersion).toBe(3);
+    expect(result.archived.dataVersion).toBe(4);
     expect(result.archived.settings.name).toBe('Archived Name');
     expect(result.archived.settings.start).toBe(start);
     expect(result.archived.settings.carbGoal).toBe(42);
@@ -79,6 +79,23 @@ test.describe('Period handling', () => {
       { label: 'Malformed', archivedAt: '2026-02-01' },
       { label: 'Valid', archivedAt: '2026-02-02' },
     ]);
+  });
+
+  test('load migrates v3 medication lifecycle fields inside an archived snapshot', async ({ page }) => {
+    await gotoApp(page);
+    const legacyMed = { id: 'archivedMed', name: 'Archived testmed', dose: '10 mg', category: 'Medikament' };
+    await seed(page, blankState({
+      archive: [{
+        label: 'Old period', archivedAt: '2026-02-01',
+        data: { dataVersion: 3, settings: { ...blankState().settings, meds: [legacyMed] }, days: {} },
+      }],
+    }));
+    const result = await page.evaluate(() => ({ archive: S.archive[0], liveMeds: S.settings.meds }));
+    expect(result.archive.label).toBe('Old period');
+    expect(result.archive.archivedAt).toBe('2026-02-01');
+    expect(result.archive.data.dataVersion).toBe(4);
+    expect(result.archive.data.settings.meds).toEqual([{ ...legacyMed, startedAt: null, stoppedAt: null }]);
+    expect(result.liveMeds).toEqual([]);
   });
 
   test('preserves both archived BP readings and recomputes their daily average', async ({ page }) => {
@@ -160,6 +177,7 @@ test.describe('Period handling', () => {
     await gotoApp(page);
     const start = addDays(today(), -30);
     const state = blankState({
+      dataVersion: 3,
       settings: { name: 'Test Patient', start, days: 90, carbGoal: 45, questions: 'Testfrage?', lastBackup: null,
         meds: [{ id: 'medA', name: 'Testmed A', dose: '10 mg', category: 'Medikament' }] },
       labs: [{ name: 'Testwert', unit: 'mg/dl', range: '70-99', base: '5.9', end: '5.3' }],
@@ -194,10 +212,50 @@ test.describe('Period handling', () => {
     expect(after.doseChangesCount).toBe(0);
     expect(after.labs).toEqual([{ name: 'Testwert', unit: 'mg/dl', range: '70-99', base: '', end: '' }]);
     expect(after.questions).toBe('');
-    expect(after.meds).toEqual([{ id: 'medA', name: 'Testmed A', dose: '10 mg', category: 'Medikament' }]);
+    expect(after.meds).toEqual([{ id: 'medA', name: 'Testmed A', dose: '10 mg', category: 'Medikament', startedAt: null, stoppedAt: null }]);
     expect(after.name).toBe('Test Patient');
     expect(after.carbGoal).toBe(45);
     expect(after.archiveCount).toBe(1);
+  });
+
+  test('new round archives all medication episodes and carries only those applicable today', async ({ page }) => {
+    await gotoApp(page);
+    const start = addDays(today(), -30);
+    const stopped = { id: 'stopped', name: 'Stopped testmed', dose: '5 mg', category: 'Medikament', startedAt: start, stoppedAt: addDays(today(), -1) };
+    const ongoing = { id: 'ongoing', name: 'Ongoing testmed', dose: '10 mg', category: 'Medikament', startedAt: start, stoppedAt: null };
+    const stoppingTomorrow = { id: 'tomorrow', name: 'Tomorrow testmed', dose: '2 mg', category: 'Medikament', startedAt: start, stoppedAt: addDays(today(), 1) };
+    const future = { id: 'future', name: 'Future testmed', dose: '1 mg', category: 'Medikament', startedAt: addDays(today(), 1), stoppedAt: null };
+    const meds = [stopped, ongoing, stoppingTomorrow, future];
+    const changes = [{ date: addDays(start, 5), medId: 'stopped', oldDose: '2 mg', newDose: '5 mg' }];
+    await seed(page, blankState({
+      settings: { ...blankState().settings, start, meds },
+      days: { [start]: { meds: { stopped: true, ongoing: false } } },
+      doseChanges: changes,
+    }));
+    await page.click('nav button[data-tab="set"]');
+    page.once('dialog', (d) => d.accept());
+    await page.click('#newRound');
+
+    const result = await page.evaluate(() => ({
+      archivedMeds: S.archive[0].data.settings.meds,
+      archivedDays: S.archive[0].data.days,
+      archivedChanges: S.archive[0].data.doseChanges,
+      liveMeds: S.settings.meds,
+      liveChanges: S.doseChanges,
+      liveStart: S.settings.start,
+    }));
+    expect(result.archivedMeds).toEqual(meds);
+    expect(result.archivedDays[start].meds).toEqual({ stopped: true, ongoing: false });
+    expect(result.archivedChanges).toEqual(changes);
+    expect(result.liveMeds).toEqual([ongoing, stoppingTomorrow]);
+    expect(result.liveChanges).toEqual([]);
+    expect(result.liveStart).toBe(today());
+
+    const archivedName = await page.evaluate(() => {
+      S.settings.meds[0].name = 'Changed live name';
+      return S.archive[0].data.settings.meds[1].name;
+    });
+    expect(archivedName).toBe('Ongoing testmed');
   });
 
   test('a migrated legacy BP report restores the exact live S reference and state', async ({ page }) => {

@@ -215,7 +215,7 @@ td.num,th.num{text-align:right}
 
 <script>
 const KEY='ketoProtokoll_v1';
-const VERSION='1.5.2'; // keep in sync with package.json, package-lock.json, and sw.js
+const VERSION='1.5.3'; // keep in sync with package.json, package-lock.json, and sw.js
 const SYMS=['Kopfschmerz','Müdigkeit','Muskelkrämpfe','Verdauung','Schwindel','Schlecht geschlafen','Heißhunger','Herzklopfen','Gereizt'];
 const DEFAULT_LABS=[['HbA1c','%'],['Glukose nüchtern','mg/dl'],['Gesamtcholesterin','mg/dl'],['LDL-Cholesterin','mg/dl'],['HDL-Cholesterin','mg/dl'],['Triglyzeride','mg/dl'],['Harnsäure','mg/dl'],['Kreatinin','mg/dl'],['eGFR','ml/min'],['GPT (ALT)','U/l'],['GOT (AST)','U/l'],['Gamma-GT','U/l'],['Natrium','mmol/l'],['Kalium','mmol/l'],['Magnesium','mmol/l'],['TSH','mU/l'],['CRP','mg/l']];
 const REFERENCES=[
@@ -303,6 +303,7 @@ const $=s=>document.querySelector(s);
 const iso=d=>d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0');
 const today=()=>iso(new Date());
 const pd=s=>{const [y,m,d]=s.split('-').map(Number);return new Date(y,m-1,d)};
+const validISODate=s=>/^\d{4}-\d{2}-\d{2}$/.test(s)&&iso(pd(s))===s;
 const addDays=(s,n)=>{const d=pd(s);d.setDate(d.getDate()+n);return iso(d)};
 const diffDays=(a,b)=>Math.round((pd(b)-pd(a))/864e5);
 const fd=(s,o)=>pd(s).toLocaleDateString('de-DE',o||{day:'2-digit',month:'2-digit'});
@@ -313,7 +314,7 @@ const vv=x=>x==null?'':String(x).replace('.',',');
 const uid=()=>'m'+Date.now().toString(36)+Math.random().toString(36).slice(2,7);
 
 let S;
-const DATA_VERSION=3;
+const DATA_VERSION=4;
 // Upgrades one saved state to the current shape without traversing its archive.
 // Shared by live data, backup import, and archived snapshots.
 function migrateState(data){
@@ -354,6 +355,14 @@ function migrateState(data){
  // what the user explicitly entered. Runs every load (not just while v<3) so
  // a settings object missing it for any reason never crashes rendering.
  if(!d.settings.alerts||typeof d.settings.alerts!=='object')d.settings.alerts={sysMin:null,sysMax:null,diaMin:null,diaMax:null,gMin:null,gMax:null,pMin:null,pMax:null,action:''};
+ if(v<4){
+  if(!d.settings.meds)d.settings.meds=[];
+  d.settings.meds.forEach(m=>{
+   if(m.startedAt===undefined)m.startedAt=null;
+   if(m.stoppedAt===undefined)m.stoppedAt=null;
+  });
+  v=4;
+ }
  d.dataVersion=v;
  return d;
 }
@@ -464,7 +473,18 @@ function alertsSummaryText(){
  if(!parts.length)return '';
  return `Vereinbarte Grenzen: ${parts.join(' · ')}${al.action?` → ${al.action}`:''}`;
 }
-function medAdherence(from,to,medId){let taken=0,logged=0;for(let i=0;i<=diffDays(from,to);i++){const d=S.days[addDays(from,i)];if(d&&d.meds&&d.meds[medId]!==undefined){logged++;if(d.meds[medId])taken++}}return {taken,logged}}
+function medAppliesOnDate(med,date){return (!med.startedAt||date>=med.startedAt)&&(!med.stoppedAt||date<med.stoppedAt)}
+function medAppliesInRange(med,from,to){for(let i=0;i<=diffDays(from,to);i++)if(medAppliesOnDate(med,addDays(from,i)))return true;return false}
+function medHasHistory(medId){return Object.values(S.days).some(d=>d&&d.meds&&Object.prototype.hasOwnProperty.call(d.meds,medId))||S.doseChanges.some(c=>c.medId===medId)}
+function doseChangeAppliesToMed(change,med){return !!med&&validISODate(change.date)&&medAppliesOnDate(med,change.date)}
+function medDoseOnDate(med,date){
+ const changes=S.doseChanges.filter(c=>c.medId===med.id&&doseChangeAppliesToMed(c,med)).sort((a,b)=>a.date<b.date?-1:a.date>b.date?1:0);
+ if(!changes.length)return med.dose;
+ const latest=changes.filter(c=>c.date<=date).at(-1);
+ return latest?latest.newDose:changes[0].oldDose;
+}
+function medPeriodText(med){return med.stoppedAt?`${med.startedAt?'seit '+fd(med.startedAt):'Beginn nicht erfasst'} · beendet ab ${fd(med.stoppedAt)}`:med.startedAt?'seit '+fd(med.startedAt):''}
+function medAdherence(from,to,med){let taken=0,logged=0;for(let i=0;i<=diffDays(from,to);i++){const ds=addDays(from,i),d=S.days[ds],value=d&&d.meds?d.meds[med.id]:undefined;if(!medAppliesOnDate(med,ds))continue;if(value===true){logged++;taken++}else if(value===false)logged++}return {taken,logged}}
 // null: never backed up. Otherwise days since the last export.
 function daysSinceBackup(){return S.settings.lastBackup?diffDays(S.settings.lastBackup,today()):null}
 // 'none' | 'warn' (7–13 days) | 'critical' (>=14 days, or never backed up), gated on >=5 logged days.
@@ -564,6 +584,7 @@ function updateAlertPanel(d){
 }
 function renderDay(){
  const d=S.days[curDate]||{},i=diffDays(S.settings.start,curDate),inR=i>=0&&i<N();
+ const meds=S.settings.meds.filter(m=>medAppliesOnDate(m,curDate));
  const showBackupWarn=backupUrgency()==='critical'&&S.settings.backupWarnDismissed!==today();
  const alertHits=checkAlerts(d);
  let h=`${alertHits.length?alertPanelHTML(alertHits):''}${showBackupWarn?backupWarnHTML():''}<div class="datebar"><button type="button" class="btn" data-nav="-1" aria-label="Vorheriger Tag">‹</button><input type="date" id="dpick" value="${curDate}" aria-label="Datum"><button type="button" class="btn" data-nav="1" aria-label="Nächster Tag">›</button>${curDate!==today()?'<button type="button" class="btn" data-nav="0">Heute</button>':''}</div>
@@ -583,7 +604,7 @@ function renderDay(){
  <div class="row wide"><div class="lbl"><b>Beschwerden</b><small>antippen, was heute auffiel</small></div><div class="chips">${SYMS.map(s=>{const on=(d.sym||[]).includes(s);return `<button type="button" data-sym="${esc(s)}" class="${on?'on':''}" aria-pressed="${on}">${s}</button>`}).join('')}</div></div>
  <div class="row wide"><label for="f_note"><b>Notiz</b><small>optional</small></label><textarea id="f_note" data-t="note">${esc(d.note)}</textarea></div>
  </div>
- ${S.settings.meds.length?`<div class="panel"><h2>Medikamente</h2>${S.settings.meds.map(m=>{const v=(d.meds||{})[m.id];return `<div class="row"><div class="lbl"><b>${esc(m.name)}</b><small>${esc(m.dose)}${m.category?' · '+esc(m.category):''}</small></div><div class="seg" role="group" aria-label="${esc(m.name)}">${[['1','Genommen'],['0','Nicht genommen']].map(([k,l])=>{const on=(k==='1'&&v===true)||(k==='0'&&v===false);return `<button type="button" data-med="${m.id}" data-mv="${k}" class="${on?'on':''}" aria-pressed="${on}">${l}</button>`}).join('')}</div></div>`}).join('')}</div>`:''}`;
+ ${meds.length?`<div class="panel"><h2>Medikamente</h2>${meds.map(m=>{const v=(d.meds||{})[m.id];return `<div class="row"><div class="lbl"><b>${esc(m.name)}</b><small>${esc(medDoseOnDate(m,curDate))}${m.category?' · '+esc(m.category):''}</small></div><div class="seg" role="group" aria-label="${esc(m.name)}">${[['1','Genommen'],['0','Nicht genommen']].map(([k,l])=>{const on=(k==='1'&&v===true)||(k==='0'&&v===false);return `<button type="button" data-med="${m.id}" data-mv="${k}" class="${on?'on':''}" aria-pressed="${on}">${l}</button>`}).join('')}</div></div>`}).join('')}</div>`:''}`;
  $('#v-day').innerHTML=h;
 }
 const BP_READING_FIELDS=['sys1','dia1','sys2','dia2'];
@@ -622,6 +643,7 @@ $('#v-day').addEventListener('click',e=>{
 const WF=[['waist','Bauchumfang','auf Nabelhöhe, morgens','cm'],['rhr','Ruhepuls','Garmin, Ø der Woche','/min'],['sleep','Schlaf','Garmin, Ø pro Nacht','h'],['stress','Stress','Garmin, Ø der Woche','0–100'],['steps','Schritte','Garmin, Ø pro Tag','/Tag']];
 function renderWeek(){
  const w=S.weeks[curWeek]||{},[a,b]=weekRange(curWeek);
+ const meds=S.settings.meds.filter(m=>medAppliesInRange(m,a,b));
  const avgs=[['Gewicht','w','kg',1],['Blutzucker','g','mg/dl',0],['Ketone','k','mmol/l',2],['Blutdruck sys','sys','mmHg',0],['Blutdruck dia','dia','mmHg',0],['Kohlenhydrate','c','g',0],['Energie','en','',1],['Hunger','hu','',1]];
  let h=`<div class="datebar"><button type="button" class="btn" data-wnav="-1" aria-label="Vorherige Woche">‹</button><select id="wsel" aria-label="Woche">${Array.from({length:nWeeks()},(_,i)=>`<option value="${i+1}" ${i+1===curWeek?'selected':''}>Woche ${i+1}</option>`).join('')}</select><button type="button" class="btn" data-wnav="1" aria-label="Nächste Woche">›</button></div>
  <p class="sub" style="margin-bottom:12px">${fd(a,{day:'numeric',month:'long'})} bis ${fd(b,{day:'numeric',month:'long'})}</p>
@@ -629,7 +651,7 @@ function renderWeek(){
  ${WF.map(([f,l,hint,u])=>`<div class="row"><label for="w_${f}"><b>${l}</b><small>${hint}</small></label><div class="inp"><input id="w_${f}" data-wf="${f}" type="text" inputmode="decimal" value="${vv(w[f])}"><span class="unit">${u}</span></div></div>`).join('')}
  <div class="row wide"><label for="w_note"><b>Wochennotiz</b><small>Wie lief die Woche? Was ist aufgefallen?</small></label><textarea id="w_note" data-wt="note">${esc(w.note)}</textarea></div></div>
  <div class="panel"><h2>Durchschnitt aus deinen Tageswerten</h2><table>${avgs.map(([l,f,u,dd])=>`<tr><td>${l}</td><td class="num">${fmt(avg(a,b,f),dd)} <span class="unit">${u}</span></td></tr>`).join('')}</table></div>
- ${S.settings.meds.length?`<div class="panel"><h2>Einnahme diese Woche</h2><table>${S.settings.meds.map(m=>{const {taken,logged}=medAdherence(a,b,m.id);return `<tr><td>${esc(m.name)}</td><td class="num">${logged?fmt(taken/logged*100,0)+' %':'–'} <span class="unit">${logged? taken+'/'+logged+' Tage':'keine Angaben'}</span></td></tr>`}).join('')}</table></div>`:''}`;
+ ${meds.length?`<div class="panel"><h2>Einnahme diese Woche</h2><table>${meds.map(m=>{const {taken,logged}=medAdherence(a,b,m);return `<tr><td>${esc(m.name)}</td><td class="num">${logged?fmt(taken/logged*100,0)+' %':'–'} <span class="unit">${logged? taken+'/'+logged+' Tage':'keine Angaben'}</span></td></tr>`}).join('')}</table></div>`:''}`;
  $('#v-week').innerHTML=h;
 }
 $('#v-week').addEventListener('change',e=>{
@@ -705,7 +727,7 @@ function chart(title,series,o={}){
  return `<figure class="chart">${cap}<svg viewBox="0 0 ${W} ${H}" role="img" aria-label="${title}">${g}</svg>${o.note?`<p class="sub">${o.note}</p>`:''}</figure>`;
 }
 function doseMarkers(){
- return S.doseChanges.map(c=>{const m=S.settings.meds.find(x=>x.id===c.medId);return {x:diffDays(S.settings.start,c.date),label:`${m?m.name:'Medikament'} → ${c.newDose}`}});
+ return S.doseChanges.filter(c=>doseChangeAppliesToMed(c,S.settings.meds.find(m=>m.id===c.medId))).map(c=>{const m=S.settings.meds.find(x=>x.id===c.medId);return {x:diffDays(S.settings.start,c.date),label:`${m.name} → ${c.newDose}`}});
 }
 const METRICS=[
  {id:'w',label:'Gewicht',unit:'kg',src:'day'},
@@ -793,7 +815,7 @@ function sheetHTML(wn,fill){
   ['Blutzucker','mg/dl, nüchtern',ds=>cell(ds,'g')],
   ['Ketone','mmol/l, nüchtern',ds=>cell(ds,'k')],
   ['Blutdruck','2× sys/dia, 1 Min. Abstand',ds=>{const d=D(ds);const slot=(s,di)=>s!=null?`${s}/${di??''}`:'<span class="empty">__/__</span>';return `<span class="bp2">${slot(d.sys1,d.dia1)}</span><span class="bp2">${slot(d.sys2,d.dia2)}</span>`}],
-  ...S.settings.meds.map(m=>[esc(m.name),esc(m.dose),ds=>{const v=(D(ds).meds||{})[m.id];return v===true?'<b class="ok">✓</b>':v===false?'<b>✗</b>':'<span class="empty">□</span>'}]),
+  ...S.settings.meds.filter(m=>medAppliesInRange(m,a,b)).map(m=>[esc(m.name),[...new Set(days.filter(ds=>medAppliesOnDate(m,ds)).map(ds=>medDoseOnDate(m,ds)))].map(esc).join(' → '),ds=>{if(!medAppliesOnDate(m,ds))return '<span class="empty">–</span>';const v=(D(ds).meds||{})[m.id];return v===true?'<b class="ok">✓</b>':v===false?'<b>✗</b>':'<span class="empty">□</span>'}]),
   ['Kohlenhydrate',`g, Limit ${S.settings.carbGoal} g`,ds=>cell(ds,'c')]
  ];
  const befindenRows=[
@@ -865,14 +887,15 @@ function generateTalkingPoints(){
  });
 
  [...S.doseChanges].sort((a,b)=>a.date<b.date?-1:a.date>b.date?1:0).forEach(c=>{
+  const med=st.meds.find(m=>m.id===c.medId);
+  if(!doseChangeAppliesToMed(c,med))return;
   const beforeStart=addDays(c.date,-7),beforeEnd=addDays(c.date,-1),afterStart=addDays(c.date,1),afterEnd=addDays(c.date,7);
   if(countLogged(beforeStart,beforeEnd,'sys')<4||countLogged(afterStart,afterEnd,'sys')<4)return;
   const sysBefore=avg(beforeStart,beforeEnd,'sys'),sysAfter=avg(afterStart,afterEnd,'sys');
   const diaBefore=avg(beforeStart,beforeEnd,'dia'),diaAfter=avg(afterStart,afterEnd,'dia');
   const sysDiff=Math.abs(sysAfter-sysBefore),diaDiff=(diaBefore!=null&&diaAfter!=null)?Math.abs(diaAfter-diaBefore):0;
   if(sysDiff>=5||diaDiff>=3){
-   const med=st.meds.find(m=>m.id===c.medId);
-   pts.push(`Nach Anpassung von ${esc(med?med.name:'einem Medikament')} am ${fd(c.date)} (auf ${esc(c.newDose)}) lag der Blutdruck in den Folgetagen bei Ø ${fmt(sysAfter,0)} statt zuvor Ø ${fmt(sysBefore,0)} mmHg (sys).`);
+   pts.push(`Nach Anpassung von ${esc(med.name)} am ${fd(c.date)} (auf ${esc(c.newDose)}) lag der Blutdruck in den Folgetagen bei Ø ${fmt(sysAfter,0)} statt zuvor Ø ${fmt(sysBefore,0)} mmHg (sys).`);
   }
  });
 
@@ -886,6 +909,8 @@ function generateTalkingPoints(){
 
 function reportHTML(){
  const st=S.settings,end=addDays(st.start,N()-1);
+ const meds=st.meds.filter(m=>medAppliesInRange(m,st.start,end));
+ const validDoseChanges=S.doseChanges.filter(c=>doseChangeAppliesToMed(c,st.meds.find(m=>m.id===c.medId)));
  const inR=Object.entries(S.days).filter(([ds,d])=>{const i=diffDays(st.start,ds);return i>=0&&i<N()&&Object.keys(d).length});
  const firstLast=f=>{let fi=null,la=null;for(let w=1;w<=nWeeks();w++){const [a,b]=weekRange(w);const v=avg(a,b,f);if(v!=null){if(!fi)fi=[w,v];la=[w,v]}}return [fi,la]};
  const wfl=f=>{const ws=Object.keys(S.weeks).map(Number).filter(n=>S.weeks[n][f]!=null).sort((a,b)=>a-b);return ws.length?[[ws[0],S.weeks[ws[0]][f]],[ws.at(-1),S.weeks[ws.at(-1)][f]]]:[null,null]};
@@ -939,9 +964,9 @@ function reportHTML(){
  <h2>Kurven</h2><div class="cg">${charts.join('')}</div>
  <h2>Laborwerte</h2>
  ${labs.length?`<table class="data"><thead><tr><th>Parameter</th><th>Einheit</th><th>Normbereich</th><th class="num">Ausgang${S.labDates.base?'<br><span class="small">'+fd(S.labDates.base,{day:'2-digit',month:'2-digit',year:'numeric'})+'</span>':''}</th><th class="num">Abschluss${S.labDates.end?'<br><span class="small">'+fd(S.labDates.end,{day:'2-digit',month:'2-digit',year:'numeric'})+'</span>':''}</th><th class="num">Veränderung</th></tr></thead><tbody>${labs.map(r=>`<tr><td>${esc(r.name)}</td><td>${esc(r.unit)}</td><td>${esc(r.range)||'–'}</td><td class="num">${esc(r.base)||'–'}${isOutOfRange(num(r.base),r.range)?'<sup>*</sup>':''}</td><td class="num">${esc(r.end)||'–'}${isOutOfRange(num(r.end),r.range)?'<sup>*</sup>':''}</td><td class="num">${delta(r.base,r.end,2).replace(/<[^>]+>/g,'')}</td></tr>`).join('')}</tbody></table>${labs.some(r=>isOutOfRange(num(r.base),r.range)||isOutOfRange(num(r.end),r.range))?'<p class="small">* außerhalb des angegebenen Normbereichs</p>':''}`:'<p>Keine Laborwerte eingetragen.</p>'}
- ${S.settings.meds.length?`<h2>Medikation</h2>
- <table class="data"><thead><tr><th>Name</th><th>Dosis</th><th>Kategorie</th><th class="num">Einnahme (gesamter Zeitraum)</th></tr></thead><tbody>${S.settings.meds.map(m=>{const {taken,logged}=medAdherence(st.start,end,m.id);return `<tr><td>${esc(m.name)}</td><td>${esc(m.dose)}</td><td>${esc(m.category)}</td><td class="num">${logged?fmt(taken/logged*100,0)+' %':'–'} <span class="small">(${logged} Tage erfasst)</span></td></tr>`}).join('')}</tbody></table>
- ${S.doseChanges.length?`<p class="small" style="margin-top:2mm">Dosisänderungen</p><table class="data"><thead><tr><th>Datum</th><th>Medikament</th><th>Alte Dosis</th><th>Neue Dosis</th></tr></thead><tbody>${[...S.doseChanges].sort((a,b)=>a.date<b.date?-1:a.date>b.date?1:0).map(c=>{const m=S.settings.meds.find(x=>x.id===c.medId);return `<tr><td>${fd(c.date)}</td><td>${esc(m?m.name:'–')}</td><td>${esc(c.oldDose)||'–'}</td><td>${esc(c.newDose)}</td></tr>`}).join('')}</tbody></table>`:''}`:''}
+ ${meds.length?`<h2>Medikation</h2>
+ <table class="data"><thead><tr><th>Name</th><th>Letzte Dosis</th><th>Kategorie</th><th class="num">Einnahme (gesamter Zeitraum)</th></tr></thead><tbody>${meds.map(m=>{const {taken,logged}=medAdherence(st.start,end,m),period=medPeriodText(m),lastDate=m.stoppedAt&&m.stoppedAt<=end?addDays(m.stoppedAt,-1):end;return `<tr><td>${esc(m.name)}${period?`<br><span class="small">${esc(period)}</span>`:''}</td><td>${esc(medDoseOnDate(m,lastDate))}</td><td>${esc(m.category)}</td><td class="num">${logged?fmt(taken/logged*100,0)+' %':'–'} <span class="small">(${logged} Tage erfasst)</span></td></tr>`}).join('')}</tbody></table>
+ ${validDoseChanges.length?`<p class="small" style="margin-top:2mm">Dosisänderungen</p><table class="data"><thead><tr><th>Datum</th><th>Medikament</th><th>Alte Dosis</th><th>Neue Dosis</th></tr></thead><tbody>${[...validDoseChanges].sort((a,b)=>a.date<b.date?-1:a.date>b.date?1:0).map(c=>{const m=st.meds.find(x=>x.id===c.medId);return `<tr><td>${fd(c.date)}</td><td>${esc(m.name)}</td><td>${esc(c.oldDose)||'–'}</td><td>${esc(c.newDose)}</td></tr>`}).join('')}</tbody></table>`:''}`:''}
  <h2>Beschwerden</h2>
  ${symC.length?`<table class="data"><thead><tr><th>Beschwerde</th>${Array.from({length:months},(_,i)=>`<th class="num">Tage ${i*30+1}–${Math.min((i+1)*30,N())}</th>`).join('')}</tr></thead><tbody>${symC.map(([s,c])=>`<tr><td>${s}</td>${c.map(x=>`<td class="num">${x||''}</td>`).join('')}</tr>`).join('')}</tbody></table>`:'<p>Keine Beschwerden notiert.</p>'}
  ${wn.length||dn.length?`<h2>Notizen</h2>${wn.map(n=>`<p><b>Woche ${n}:</b> ${esc(S.weeks[n].note)}</p>`).join('')}${dn.length?`<p class="small" style="margin-top:2mm">${dn.map(([ds,d])=>`<b>${fd(ds)}</b> ${esc(d.note)}`).join(' &nbsp; ')}</p>`:''}`:''}
@@ -999,8 +1024,8 @@ function renderSet(){
  <div class="panel"><h2>Neuer Durchgang</h2><p class="sub">Archiviert den aktuellen Zeitraum vollständig (Tageswerte, Wochenwerte, Labor, Dosisänderungen) und beginnt heute neu. Laufende Medikamente werden unverändert übernommen.</p>
  <div class="btns"><button type="button" class="btn primary" id="newRound">Neuen Durchgang starten</button></div></div>
  ${S.archive.length?`<div class="panel"><h2>Frühere Durchgänge</h2><p class="sub">Nur der Bericht lässt sich aus einem früheren Durchgang erneut drucken.</p>${archiveRows}</div>`:''}
- <div class="panel scroll"><h2>Medikamente</h2><p class="sub">Einmal definieren, im Tagesprotokoll täglich abhaken.</p><table class="labtbl"><thead><tr><th>Name</th><th>Dosis</th><th>Kategorie</th><th></th><th></th></tr></thead><tbody>
- ${st.meds.map((m,i)=>`<tr><td><input data-mi="${i}" data-mk="name" value="${esc(m.name)}" aria-label="Name"></td><td style="width:100px"><input data-mi="${i}" data-mk="dose" value="${esc(m.dose)}" aria-label="Dosis"></td><td style="width:150px"><select data-mi="${i}" data-mk="category" aria-label="Kategorie"><option value="Medikament" ${m.category==='Medikament'?'selected':''}>Medikament</option><option value="Nahrungsergänzung" ${m.category==='Nahrungsergänzung'?'selected':''}>Nahrungsergänzung</option></select></td><td style="width:100px"><button type="button" class="btn" data-mdose="${i}" style="padding:4px 8px;font-size:.85rem">Dosis geändert</button></td><td style="width:36px"><button type="button" class="btn" data-mdel="${i}" aria-label="${esc(m.name)} entfernen" style="padding:4px 8px">✕</button></td></tr>`).join('')}
+ <div class="panel scroll"><h2>Medikamente</h2><p class="sub">Einmal definieren, im Tagesprotokoll täglich abhaken. Bei Wiederaufnahme nach einem Stopp einen neuen Eintrag hinzufügen.</p><table class="labtbl"><thead><tr><th>Name</th><th>Dosis</th><th>Kategorie</th><th></th><th></th></tr></thead><tbody>
+ ${st.meds.map((m,i)=>{const locked=m.stoppedAt||medHasHistory(m.id);return `<tr><td><input data-mi="${i}" data-mk="name" value="${esc(m.name)}" aria-label="Name" ${locked?'readonly':''}>${locked?'<small class="sub">Historischer Eintrag</small>':''}${m.stoppedAt?`<small class="sub">Beendet ab ${fd(m.stoppedAt)}</small>`:''}</td><td style="width:100px"><input data-mi="${i}" data-mk="dose" value="${esc(m.dose)}" aria-label="Dosis" ${locked?'readonly':''}></td><td style="width:150px"><select data-mi="${i}" data-mk="category" aria-label="Kategorie" ${locked?'disabled':''}><option value="Medikament" ${m.category==='Medikament'?'selected':''}>Medikament</option><option value="Nahrungsergänzung" ${m.category==='Nahrungsergänzung'?'selected':''}>Nahrungsergänzung</option></select></td><td style="width:100px">${m.stoppedAt?'':`<button type="button" class="btn" data-mdose="${i}" style="padding:4px 8px;font-size:.85rem">Dosis geändert</button>`}</td><td style="width:36px">${m.stoppedAt?'':`<button type="button" class="btn" data-mdel="${i}" aria-label="${esc(m.name)} beenden oder entfernen" style="padding:4px 8px">✕</button>`}</td></tr>`}).join('')}
  </tbody></table><div class="btns"><button type="button" class="btn" id="medAdd">Medikament hinzufügen</button></div></div>
  <div class="panel"><h2>Mit dem Arzt vereinbarte Grenzwerte</h2><p class="sub">Nur Werte eintragen, die du mit deinem Arzt abgesprochen hast.</p>
  ${alertRow('sysMin','sysMax','Blutdruck systolisch','mmHg',st.alerts)}
@@ -1029,7 +1054,7 @@ $('#v-set').addEventListener('change',e=>{
   else S.settings[k]=t.value.trim();
   save();curWeek=Math.min(nWeeks(),Math.max(1,weekOf(today())));renderHead();return
  }
- if(t.dataset.mi!=null){S.settings.meds[+t.dataset.mi][t.dataset.mk]=t.value.trim();save()}
+ if(t.dataset.mi!=null){const m=S.settings.meds[+t.dataset.mi];if(!m||m.stoppedAt||medHasHistory(m.id))return;m[t.dataset.mk]=t.value.trim();save()}
 });
 $('#v-set').addEventListener('click',e=>{
  const b=e.target.closest('button');if(!b)return;
@@ -1040,9 +1065,35 @@ $('#v-set').addEventListener('click',e=>{
   const rows=Object.keys(S.days).sort().map(ds=>{const d=S.days[ds];return [ds,diffDays(S.settings.start,ds)+1,...f.map(k=>d[k]==null?'':String(d[k]).replace('.',',')),(d.sym||[]).join(', '),(d.note||'').replace(/[\r\n;]+/g,' ')].map(x=>`"${String(x).replace(/"/g,'""')}"`).join(';')});
   download(`keto-protokoll-${today()}.csv`,'\ufeff'+[hd.join(';'),...rows].join('\r\n'),'text/csv')}
  if(id==='reset'&&confirm('Wirklich alle Daten löschen? Das lässt sich nicht rückgängig machen.')){localStorage.removeItem(KEY);load();curDate=today();renderAll();status('Gelöscht')}
- if(id==='medAdd'){S.settings.meds.push({id:uid(),name:'',dose:'',category:'Medikament'});save();renderSet();const ins=document.querySelectorAll('#v-set input[data-mk="name"]');ins[ins.length-1].focus()}
- else if(b.dataset.mdel!=null){const m=S.settings.meds[+b.dataset.mdel];if((m.name||m.dose)&&!confirm(`"${m.name||'Medikament'}" entfernen?`))return;S.settings.meds.splice(+b.dataset.mdel,1);save('Entfernt');renderSet()}
- else if(b.dataset.mdose!=null){const m=S.settings.meds[+b.dataset.mdose];const nv=prompt(`Neue Dosis für ${m.name||'dieses Medikament'}:`,m.dose||'');if(nv==null||!nv.trim())return;const dt=prompt('Datum der Änderung (JJJJ-MM-TT):',today());if(dt==null||!/^\d{4}-\d{2}-\d{2}$/.test(dt))return;S.doseChanges.push({date:dt,medId:m.id,oldDose:m.dose,newDose:nv.trim()});m.dose=nv.trim();save('Dosis aktualisiert');renderSet()}
+ if(id==='medAdd'){S.settings.meds.push({id:uid(),name:'',dose:'',category:'Medikament',startedAt:today(),stoppedAt:null});save();renderSet();const ins=document.querySelectorAll('#v-set input[data-mk="name"]');ins[ins.length-1].focus()}
+ else if(b.dataset.mdel!=null){
+  const m=S.settings.meds[+b.dataset.mdel];
+  if(!m||m.stoppedAt)return;
+  if(medHasHistory(m.id)){
+   const input=prompt('Ab welchem Datum wird dieses Medikament nicht mehr eingenommen? (JJJJ-MM-TT)',today());
+   if(input===null)return;
+   const date=input.trim();
+   if(!validISODate(date)){status('Bitte ein gültiges Datum (JJJJ-MM-TT) eingeben');return}
+   if(m.startedAt&&date<=m.startedAt){status('Stoppdatum muss nach dem Beginn liegen');return}
+   const laterLog=Object.entries(S.days).some(([ds,d])=>ds>=date&&d&&d.meds&&Object.prototype.hasOwnProperty.call(d.meds,m.id));
+   const laterChange=S.doseChanges.some(c=>c.medId===m.id&&c.date>=date);
+   if((laterLog||laterChange)&&!confirm('Ab diesem Datum vorhandene Einnahme- und Dosisänderungseinträge bleiben gespeichert, werden aber in den betreffenden Ansichten und Einnahmeberechnungen nicht mehr berücksichtigt. Trotzdem beenden?'))return;
+   m.stoppedAt=date;save('Beendet');renderSet();return;
+  }
+  if((m.name||m.dose)&&!confirm(`"${m.name||'Medikament'}" entfernen?`))return;
+  S.settings.meds.splice(+b.dataset.mdel,1);save('Entfernt');renderSet();
+ }
+ else if(b.dataset.mdose!=null){
+  const m=S.settings.meds[+b.dataset.mdose];
+  if(!m||m.stoppedAt)return;
+  const nv=prompt(`Neue Dosis für ${m.name||'dieses Medikament'}:`,m.dose||'');
+  if(nv==null||!nv.trim())return;
+  const input=prompt('Datum der Änderung (JJJJ-MM-TT):',today());
+  if(input===null)return;
+  const date=input.trim();
+  if(!validISODate(date)||m.startedAt&&date<m.startedAt||m.stoppedAt&&date>=m.stoppedAt){status('Bitte ein gültiges Datum innerhalb des Einnahmezeitraums eingeben');return}
+  S.doseChanges.push({date,medId:m.id,oldDose:m.dose,newDose:nv.trim()});m.dose=nv.trim();save('Dosis aktualisiert');renderSet();
+ }
  else if(b.dataset.extend!=null){S.settings.days=(Number(S.settings.days)||0)+Number(b.dataset.extend);save();renderSet();renderHead()}
  else if(id==='newRound'){
   const end=addDays(S.settings.start,N()-1);
@@ -1055,6 +1106,7 @@ $('#v-set').addEventListener('click',e=>{
 function startNewRound(){
  const t=today(),end=addDays(S.settings.start,N()-1);
  S.archive.push({archivedAt:t,label:`${S.settings.start} – ${end}`,data:JSON.parse(JSON.stringify({settings:S.settings,days:S.days,weeks:S.weeks,labs:S.labs,labDates:S.labDates,doseChanges:S.doseChanges}))});
+ S.settings.meds=S.settings.meds.filter(m=>medAppliesOnDate(m,t));
  S.settings.start=t;
  S.days={};
  S.weeks={};

@@ -116,7 +116,7 @@ test.describe('Two blood pressure readings, averaged', () => {
       weeks: {}, labs: [], labDates: { base: '', end: '' }, doseChanges: [], archive: [], refRead: {},
     }));
 
-    expect(result.dataVersion).toBe(3);
+    expect(result.dataVersion).toBe(4);
     const day = result.days[today()];
     expect(day.sys1).toBe(118);
     expect(day.dia1).toBe(76);
