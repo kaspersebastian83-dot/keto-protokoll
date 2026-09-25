@@ -32,13 +32,27 @@ test.describe('PWA / service worker', () => {
     }
   });
 
-  test('a page reload while offline still loads from cache', async ({ page, context }) => {
+  test('cached app shell reloads through the service worker, including offline in Chromium', async ({ page, context, browserName }) => {
     await gotoApp(page);
     await page.waitForFunction(() => navigator.serviceWorker.controller !== null, { timeout: 10000 });
 
+    // Playwright WebKit rejects SW-served navigation under setOffline(true),
+    // including a service worker that returns a literal response:
+    // https://github.com/microsoft/playwright/issues/42775
+    if (browserName === 'webkit') {
+      expect(await page.evaluate(async () => !!(await caches.match('./index.html')))).toBe(true);
+      const response = await page.reload({ waitUntil: 'load' });
+      expect(response.fromServiceWorker()).toBe(true);
+      await expect(page.locator('h1')).toHaveText('Keto-Protokoll');
+      return;
+    }
+
     await context.setOffline(true);
-    await page.reload({ waitUntil: 'load' });
-    await expect(page.locator('h1')).toHaveText('Keto-Protokoll');
-    await context.setOffline(false);
+    try {
+      await page.reload({ waitUntil: 'load' });
+      await expect(page.locator('h1')).toHaveText('Keto-Protokoll');
+    } finally {
+      await context.setOffline(false);
+    }
   });
 });
