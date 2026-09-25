@@ -46,7 +46,7 @@ test.describe('Medication log', () => {
       migrate(S);
       return { version: S.dataVersion, meds: S.settings.meds, unchangedOnSecondMigration: JSON.stringify(S) === first };
     });
-    expect(result.version).toBe(5);
+    expect(result.version).toBe(6);
     expect(result.meds).toEqual([
       { id: 'legacyA', name: 'Testmed A', dose: '10 mg', category: 'Medikament', startedAt: null, stoppedAt: null },
       { id: 'legacyB', name: 'Test supplement', dose: '2 units', category: 'Nahrungsergänzung', startedAt: '2026-01-05', stoppedAt: null },

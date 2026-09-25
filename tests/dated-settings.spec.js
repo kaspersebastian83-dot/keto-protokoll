@@ -22,7 +22,7 @@ test.describe('Dated carbohydrate goals and agreed thresholds', () => {
       };
     });
     expect(result).toEqual({
-      version: 5, goal: 42, alerts: oldAlerts,
+      version: 6, goal: 42, alerts: oldAlerts,
       goals: [{ date: null, value: 42 }], history: [{ date: null, value: oldAlerts }],
       detached: true, idempotent: true,
     });
@@ -36,9 +36,11 @@ test.describe('Dated carbohydrate goals and agreed thresholds', () => {
       carbGoalHistory: [{ date: null, value: 50 }, { date: '2026-09-20', value: 30 }],
       alertHistory: [{ date: null, value: alert({ gMax: 180 }) }, { date: '2026-09-20', value: current }],
     };
-    await seed(page, blankState({ settings: {
+    const legacy = blankState({ dataVersion: 5, settings: {
       ...blankState().settings, carbGoal: 99, alerts: alert({ gMax: 999, action: 'Stale action' }), ...histories,
-    } }));
+    } });
+    delete legacy.settings.measurementSchedule;
+    await seed(page, legacy);
     const result = await page.evaluate(() => ({
       goal: S.settings.carbGoal, alerts: S.settings.alerts,
       histories: { carbGoalHistory: S.settings.carbGoalHistory, alertHistory: S.settings.alertHistory },

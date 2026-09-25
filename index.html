@@ -64,6 +64,9 @@ textarea{min-height:64px;resize:vertical}
 .chips{display:flex;flex-wrap:wrap;gap:6px;margin-top:6px}
 .chips button{border-radius:999px;padding:5px 12px;font-size:.9rem}
 .chips button.on{background:var(--s2);border-color:var(--s2);color:#fff}
+.ms-weekdays{grid-column:1/-1;display:flex;flex-wrap:wrap;gap:6px}
+.ms-weekdays button{min-width:44px;min-height:44px;border:1px solid var(--line);border-radius:4px;background:var(--paper);color:var(--text);font:inherit;cursor:pointer}
+.ms-weekdays button[aria-pressed="true"]{background:var(--ink);border-color:var(--ink);color:var(--paper)}
 .badge{display:inline-block;font-size:.78rem;color:var(--keto);background:var(--ketoBand);padding:2px 9px;border-radius:999px;margin:5px 0}
 .lit-item{padding:12px 0}
 .lit-item label{display:flex;align-items:flex-start;gap:8px;cursor:pointer}
@@ -216,7 +219,7 @@ td.num,th.num{text-align:right}
 <script>
 const KEY='ketoProtokoll_v1';
 const RECOVERY_KEY='ketoProtokoll_recovery_v1';
-const VERSION='1.5.5'; // keep in sync with package.json, package-lock.json, and sw.js
+const VERSION='1.6.0'; // keep in sync with package.json, package-lock.json, and sw.js
 const SYMS=['Kopfschmerz','Müdigkeit','Muskelkrämpfe','Verdauung','Schwindel','Schlecht geschlafen','Heißhunger','Herzklopfen','Gereizt'];
 const DEFAULT_LABS=[['HbA1c','%'],['Glukose nüchtern','mg/dl'],['Gesamtcholesterin','mg/dl'],['LDL-Cholesterin','mg/dl'],['HDL-Cholesterin','mg/dl'],['Triglyzeride','mg/dl'],['Harnsäure','mg/dl'],['Kreatinin','mg/dl'],['eGFR','ml/min'],['GPT (ALT)','U/l'],['GOT (AST)','U/l'],['Gamma-GT','U/l'],['Natrium','mmol/l'],['Kalium','mmol/l'],['Magnesium','mmol/l'],['TSH','mU/l'],['CRP','mg/l']];
 const REFERENCES=[
@@ -315,7 +318,38 @@ const vv=x=>x==null?'':String(x).replace('.',',');
 const uid=()=>'m'+Date.now().toString(36)+Math.random().toString(36).slice(2,7);
 
 let S;
-const DATA_VERSION=5;
+const DATA_VERSION=6;
+const MEASUREMENT_IDS=['w','g','k','bp','p'];
+const MEASUREMENT_LABELS={w:'Gewicht',g:'Blutzucker',k:'Ketone',bp:'Blutdruck',p:'Puls'};
+const ISO_WEEKDAYS=[['Mo','Montag'],['Di','Dienstag'],['Mi','Mittwoch'],['Do','Donnerstag'],['Fr','Freitag'],['Sa','Samstag'],['So','Sonntag']];
+function defaultMeasurementSchedule(){
+ return Object.fromEntries(MEASUREMENT_IDS.map(id=>[id,{mode:'daily',weekdays:[]}]));
+}
+function validMeasurementScheduleEntry(entry){
+ if(!plainObject(entry)||!['daily','weekdays','optional'].includes(entry.mode)||!Array.isArray(entry.weekdays))return false;
+ if(Object.keys(entry).some(key=>key!=='mode'&&key!=='weekdays'))return false;
+ if(entry.mode!=='weekdays')return entry.weekdays.length===0;
+ return entry.weekdays.length>0&&entry.weekdays.every(day=>Number.isInteger(day)&&day>=1&&day<=7)&&
+  new Set(entry.weekdays).size===entry.weekdays.length;
+}
+function validMeasurementSchedule(schedule){
+ return plainObject(schedule)&&Object.keys(schedule).length===MEASUREMENT_IDS.length&&
+  MEASUREMENT_IDS.every(id=>validMeasurementScheduleEntry(schedule[id]));
+}
+function measurementScheduleEntry(id){
+ if(!MEASUREMENT_IDS.includes(id))return null;
+ const entry=S?.settings?.measurementSchedule?.[id];
+ return validMeasurementScheduleEntry(entry)?entry:{mode:'daily',weekdays:[]};
+}
+const isoWeekday=date=>((pd(date).getDay()+6)%7)+1;
+function isMeasurementDue(id,date){
+ if(!MEASUREMENT_IDS.includes(id)||typeof date!=='string'||!validISODate(date))return false;
+ const start=S?.settings?.start;
+ if(typeof start!=='string'||!validISODate(start)||date<start||date>addDays(start,N()-1))return false;
+ const entry=measurementScheduleEntry(id);
+ return entry.mode==='daily'||entry.mode==='weekdays'&&entry.weekdays.includes(isoWeekday(date));
+}
+function dueMeasurementIds(date){return MEASUREMENT_IDS.filter(id=>isMeasurementDue(id,date))}
 // Upgrades one saved state to the current shape without traversing its archive.
 // Shared by live data, backup import, and archived snapshots.
 function migrateState(data){
@@ -368,6 +402,10 @@ function migrateState(data){
   if(!Array.isArray(d.settings.carbGoalHistory))d.settings.carbGoalHistory=[{date:null,value:d.settings.carbGoal}];
   if(!Array.isArray(d.settings.alertHistory))d.settings.alertHistory=[{date:null,value:{...d.settings.alerts}}];
   v=5;
+ }
+ if(v<6){
+  if(d.settings.measurementSchedule===undefined)d.settings.measurementSchedule=defaultMeasurementSchedule();
+  v=6;
  }
  d.dataVersion=v;
  return d;
@@ -1093,6 +1131,10 @@ function renderSet(){
  const st=S.settings;
  const recovery=readRecovery();
  const recoveryLine=recovery?`<p class="sub">Lokale Sicherheitskopie vor dem letzten Backup-Laden: ${new Date(recovery.createdAt).toLocaleString('de-DE',{day:'2-digit',month:'2-digit',year:'numeric',hour:'2-digit',minute:'2-digit'})}</p><div class="btns"><button type="button" class="btn" id="restoreRecovery">Vorherige Daten wiederherstellen</button><button type="button" class="btn danger" id="deleteRecovery">Sicherheitskopie löschen</button></div>`:'';
+ const scheduleRows=MEASUREMENT_IDS.map(id=>{
+  const entry=measurementScheduleEntry(id),label=MEASUREMENT_LABELS[id];
+  return `<div class="row"><label for="ms_${id}"><b>${label}</b></label><select id="ms_${id}" data-ms-mode="${id}"><option value="daily" ${entry.mode==='daily'?'selected':''}>Täglich</option><option value="weekdays" ${entry.mode==='weekdays'?'selected':''}>Wochentage</option><option value="optional" ${entry.mode==='optional'?'selected':''}>Optional</option></select>${entry.mode==='weekdays'?`<div class="ms-weekdays" role="group" aria-label="${label}: Wochentage">${ISO_WEEKDAYS.map(([short,long],i)=>`<button type="button" data-ms-id="${id}" data-ms-day="${i+1}" aria-label="${label}, ${long}" aria-pressed="${entry.weekdays.includes(i+1)}">${short}</button>`).join('')}</div>`:''}</div>`;
+ }).join('');
  const archiveRows=[...Array(S.archive.length).keys()].reverse().map(idx=>{
   const a=S.archive[idx];
   return `<div class="row"><div class="lbl"><b>${esc(a.label)}</b><small>archiviert am ${fd(a.archivedAt,{day:'numeric',month:'long',year:'numeric'})}</small></div><div class="btns" style="margin-top:0;justify-content:flex-end"><button type="button" class="btn" data-arview="${idx}">Bericht ansehen</button><button type="button" class="btn danger" data-ardel="${idx}">Löschen</button></div></div>`;
@@ -1103,6 +1145,7 @@ function renderSet(){
  <div class="row"><label for="s_days"><b>Dauer</b><small>in Tagen</small></label><div class="inp" style="flex-wrap:wrap"><input id="s_days" data-s="days" inputmode="numeric" value="${st.days}" style="flex:1 1 60px"><span class="unit">Tage</span><button type="button" class="btn" data-extend="28" style="padding:5px 8px;font-size:.78rem;white-space:nowrap">+4 Wochen</button><button type="button" class="btn" data-extend="84" style="padding:5px 8px;font-size:.78rem;white-space:nowrap">+12 Wochen</button></div></div>
  <div class="row"><label for="s_carb"><b>Kohlenhydrat-Limit</b><small>wie mit dem Arzt abgesprochen</small></label><div class="inp"><input id="s_carb" data-s="carbGoal" inputmode="numeric" value="${st.carbGoal}"><span class="unit">g/Tag</span></div></div>
  <div class="row"><label for="s_carb_date"><b>Limit gilt ab</b></label><input id="s_carb_date" type="date" value="${today()}" min="${st.start}" max="${today()}"></div></div>
+ <div class="panel"><h2>Messplan</h2><p class="sub">Lege fest, welche Messungen dir an welchen Tagen als vorgesehen angezeigt werden sollen. Du kannst Werte trotzdem jederzeit eintragen.</p>${scheduleRows}</div>
  <div class="panel"><h2>Neuer Durchgang</h2><p class="sub">Archiviert den aktuellen Zeitraum vollständig (Tageswerte, Wochenwerte, Labor, Dosisänderungen) und beginnt heute neu. Laufende Medikamente werden unverändert übernommen.</p>
  <div class="btns"><button type="button" class="btn primary" id="newRound">Neuen Durchgang starten</button></div></div>
  ${S.archive.length?`<div class="panel"><h2>Frühere Durchgänge</h2><p class="sub">Nur der Bericht lässt sich aus einem früheren Durchgang erneut drucken.</p>${archiveRows}</div>`:''}
@@ -1148,8 +1191,19 @@ function refreshDatedSettings(){
  showDatedSettingsValues('al_date',alertDate);
  renderHead();
 }
+function editableMeasurementSchedule(){
+ if(!validMeasurementSchedule(S.settings.measurementSchedule))S.settings.measurementSchedule=defaultMeasurementSchedule();
+ return S.settings.measurementSchedule;
+}
 $('#v-set').addEventListener('change',e=>{
  const t=e.target,k=t.dataset.s;
+ if(t.dataset.msMode!=null){
+  const id=t.dataset.msMode,mode=t.value;
+  if(!MEASUREMENT_IDS.includes(id)||!['daily','weekdays','optional'].includes(mode))return;
+  const schedule=editableMeasurementSchedule(),prior=schedule[id];
+  schedule[id]={mode,weekdays:mode==='weekdays'?(prior.mode==='weekdays'?[...prior.weekdays]:[isoWeekday(today())]):[]};
+  save();renderSet();return;
+ }
  if(t.id==='s_carb_date'||t.id==='al_date'){
   const date=settingsEffectiveDate(t.id);if(date)showDatedSettingsValues(t.id,date);
   return;
@@ -1182,6 +1236,19 @@ $('#v-set').addEventListener('change',e=>{
 $('#v-set').addEventListener('click',e=>{
  const b=e.target.closest('button');if(!b)return;
  const id=b.id;
+ if(b.dataset.msDay!=null){
+  const measurement=b.dataset.msId,day=Number(b.dataset.msDay);
+  if(!MEASUREMENT_IDS.includes(measurement)||!Number.isInteger(day)||day<1||day>7)return;
+  const schedule=editableMeasurementSchedule(),entry=schedule[measurement];
+  if(entry.mode!=='weekdays')return;
+  const selected=new Set(entry.weekdays);
+  if(selected.has(day)){
+   if(selected.size===1){status('Mindestens einen Wochentag auswählen');return}
+   selected.delete(day);
+  }else selected.add(day);
+  schedule[measurement]={mode:'weekdays',weekdays:[...selected].sort((a,b)=>a-b)};
+  save();renderSet();return;
+ }
  if(id==='exp'){doExportBackup();renderSet();renderHead()}
  if(id==='imp')$('#importFile').click();
  if(id==='csv'){const f=['w','g','k','sys','dia','p','c','en','hu','plan'];const hd=['Datum','Tag','Gewicht_kg','Blutzucker_mgdl','Ketone_mmolL','RR_sys','RR_dia','Puls','KH_g','Energie','Hunger','Im_Plan','Beschwerden','Notiz'];
@@ -1275,11 +1342,13 @@ function validateBackupShape(data){
  for(const key of ['weeks','labDates','refRead'])if(key in data&&!plainObject(data[key]))return false;
  for(const key of ['labs','doseChanges','archive'])if(key in data&&!Array.isArray(data[key]))return false;
  for(const key of ['alerts'])if(key in data.settings&&!plainObject(data.settings[key]))return false;
+ if('measurementSchedule' in data.settings&&!plainObject(data.settings.measurementSchedule))return false;
  for(const key of ['meds','carbGoalHistory','alertHistory'])if(key in data.settings&&!Array.isArray(data.settings[key]))return false;
  return true;
 }
 function validatePreparedBackup(data){
  return validateBackupShape(data)&&validISODate(data.settings.start)&&
+  validMeasurementSchedule(data.settings.measurementSchedule)&&
   optionalDate(data.settings.lastBackup)&&
   ['weeks','labDates','refRead'].every(key=>plainObject(data[key]))&&
   ['labs','doseChanges','archive'].every(key=>Array.isArray(data[key]))&&
