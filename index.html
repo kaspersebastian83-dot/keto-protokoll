@@ -215,7 +215,8 @@ td.num,th.num{text-align:right}
 
 <script>
 const KEY='ketoProtokoll_v1';
-const VERSION='1.5.4'; // keep in sync with package.json, package-lock.json, and sw.js
+const RECOVERY_KEY='ketoProtokoll_recovery_v1';
+const VERSION='1.5.5'; // keep in sync with package.json, package-lock.json, and sw.js
 const SYMS=['Kopfschmerz','Müdigkeit','Muskelkrämpfe','Verdauung','Schwindel','Schlecht geschlafen','Heißhunger','Herzklopfen','Gereizt'];
 const DEFAULT_LABS=[['HbA1c','%'],['Glukose nüchtern','mg/dl'],['Gesamtcholesterin','mg/dl'],['LDL-Cholesterin','mg/dl'],['HDL-Cholesterin','mg/dl'],['Triglyzeride','mg/dl'],['Harnsäure','mg/dl'],['Kreatinin','mg/dl'],['eGFR','ml/min'],['GPT (ALT)','U/l'],['GOT (AST)','U/l'],['Gamma-GT','U/l'],['Natrium','mmol/l'],['Kalium','mmol/l'],['Magnesium','mmol/l'],['TSH','mU/l'],['CRP','mg/l']];
 const REFERENCES=[
@@ -388,16 +389,26 @@ function migrate(data){
  });
  return d;
 }
+let lastPersistedRaw=null;
 function load(){
  let raw=null;
- try{raw=JSON.parse(localStorage.getItem(KEY))}catch(e){raw=null}
+ try{lastPersistedRaw=localStorage.getItem(KEY);raw=JSON.parse(lastPersistedRaw)}catch(e){raw=null}
  S=migrate(raw);
  syncCurrentSettings();
 }
 let stT;
+function persistState(state=S){
+ try{
+  const serialized=JSON.stringify(state);
+  localStorage.setItem(KEY,serialized);
+  lastPersistedRaw=serialized;
+  return true;
+ }catch(e){return false}
+}
 function save(msg){
- try{localStorage.setItem(KEY,JSON.stringify(S));status(msg||'Gespeichert')}
- catch(e){status('Speichern fehlgeschlagen – bitte Backup exportieren')}
+ const saved=persistState();
+ status(saved?msg||'Gespeichert':'Speichern fehlgeschlagen – bitte Backup exportieren');
+ return saved;
 }
 function status(t){const el=$('#status');el.textContent=t;el.classList.add('show');clearTimeout(stT);stT=setTimeout(()=>el.classList.remove('show'),1400)}
 const N=()=>Math.max(7,Number(S.settings.days)||90);
@@ -659,9 +670,12 @@ const BP_READING_FIELDS=['sys1','dia1','sys2','dia2'];
 $('#v-day').addEventListener('change',e=>{
  const t=e.target;
  if(t.id==='dpick'){if(t.value){curDate=t.value;renderDay();renderHead()}return}
+ let n;
+ if(t.dataset.f){
+  n=num(t.value);if(t.value.trim()!==''&&n===null){status('Bitte eine Zahl eingeben');return}
+ }
  const d=getDay(curDate);
  if(t.dataset.f){
-  const n=num(t.value);if(t.value.trim()!==''&&n===null){status('Bitte eine Zahl eingeben');return}
   if(n===null)delete d[t.dataset.f];else d[t.dataset.f]=n;
   if(BP_READING_FIELDS.includes(t.dataset.f))recomputeBP(d);
  }
@@ -1077,6 +1091,8 @@ function alertRow(minK,maxK,label,unit,al){
 }
 function renderSet(){
  const st=S.settings;
+ const recovery=readRecovery();
+ const recoveryLine=recovery?`<p class="sub">Lokale Sicherheitskopie vor dem letzten Backup-Laden: ${new Date(recovery.createdAt).toLocaleString('de-DE',{day:'2-digit',month:'2-digit',year:'numeric',hour:'2-digit',minute:'2-digit'})}</p><div class="btns"><button type="button" class="btn" id="restoreRecovery">Vorherige Daten wiederherstellen</button><button type="button" class="btn danger" id="deleteRecovery">Sicherheitskopie löschen</button></div>`:'';
  const archiveRows=[...Array(S.archive.length).keys()].reverse().map(idx=>{
   const a=S.archive[idx];
   return `<div class="row"><div class="lbl"><b>${esc(a.label)}</b><small>archiviert am ${fd(a.archivedAt,{day:'numeric',month:'long',year:'numeric'})}</small></div><div class="btns" style="margin-top:0;justify-content:flex-end"><button type="button" class="btn" data-arview="${idx}">Bericht ansehen</button><button type="button" class="btn danger" data-ardel="${idx}">Löschen</button></div></div>`;
@@ -1103,7 +1119,7 @@ function renderSet(){
  </div>
  <div class="panel"><h2>Backup</h2><p class="sub">Die Daten liegen nur in diesem Browser. Sichere sie regelmäßig, und übertrage sie so auch zwischen Handy und Rechner.${st.lastBackup?` Letztes Backup: ${fd(st.lastBackup,{day:'numeric',month:'long'})}.`:''}</p>
  <p class="sub" id="storageLine">${storageStatusLine()}</p>
- <div class="btns"><button type="button" class="btn primary" id="exp">Backup speichern</button><button type="button" class="btn" id="imp">Backup laden</button><button type="button" class="btn" id="csv">Tageswerte als CSV</button></div></div>
+ <div class="btns"><button type="button" class="btn primary" id="exp">Backup speichern</button><button type="button" class="btn" id="imp">Backup laden</button><button type="button" class="btn" id="csv">Tageswerte als CSV</button></div>${recoveryLine}</div>
  <div class="panel"><h2>Alles löschen</h2><p class="sub">Entfernt alle Einträge aus diesem Browser.</p><div class="btns"><button type="button" class="btn danger" id="reset">Alle Daten löschen</button></div></div>
  <p class="sub" style="text-align:center">Keto-Protokoll v${VERSION}</p>`;
 }
@@ -1143,7 +1159,11 @@ $('#v-set').addEventListener('change',e=>{
   const ak=t.dataset.al;
   const next={...alertsOnDate(date)};
   if(ak==='action')next.action=t.value.trim();
-  else{const n=num(t.value);next[ak]=(t.value.trim()===''||n===null)?null:n}
+  else{
+   const n=num(t.value);
+   if(t.value.trim()!==''&&n===null){status('Bitte eine Zahl eingeben');return}
+   next[ak]=n;
+  }
   upsertAlertHistory(date,next);syncCurrentSettings();refreshDatedSettings();return;
  }
  if(k){
@@ -1167,7 +1187,13 @@ $('#v-set').addEventListener('click',e=>{
  if(id==='csv'){const f=['w','g','k','sys','dia','p','c','en','hu','plan'];const hd=['Datum','Tag','Gewicht_kg','Blutzucker_mgdl','Ketone_mmolL','RR_sys','RR_dia','Puls','KH_g','Energie','Hunger','Im_Plan','Beschwerden','Notiz'];
   const rows=Object.keys(S.days).sort().map(ds=>{const d=S.days[ds];return [ds,diffDays(S.settings.start,ds)+1,...f.map(k=>d[k]==null?'':String(d[k]).replace('.',',')),(d.sym||[]).join(', '),(d.note||'').replace(/[\r\n;]+/g,' ')].map(x=>`"${String(x).replace(/"/g,'""')}"`).join(';')});
   download(`keto-protokoll-${today()}.csv`,'\ufeff'+[hd.join(';'),...rows].join('\r\n'),'text/csv')}
- if(id==='reset'&&confirm('Wirklich alle Daten löschen? Das lässt sich nicht rückgängig machen.')){localStorage.removeItem(KEY);load();curDate=today();renderAll();status('Gelöscht')}
+ if(id==='restoreRecovery'){restoreRecovery();return}
+ if(id==='deleteRecovery'){deleteRecovery();return}
+ if(id==='reset'&&confirm('Wirklich alle Daten löschen? Das lässt sich nicht rückgängig machen.')){
+  try{localStorage.removeItem(KEY);localStorage.removeItem(RECOVERY_KEY)}
+  catch(e){status('Löschen fehlgeschlagen');return}
+  load();curDate=today();renderAll();status('Gelöscht');return;
+ }
  if(id==='medAdd'){S.settings.meds.push({id:uid(),name:'',dose:'',category:'Medikament',startedAt:today(),stoppedAt:null});save();renderSet();const ins=document.querySelectorAll('#v-set input[data-mk="name"]');ins[ins.length-1].focus()}
  else if(b.dataset.mdel!=null){
   const m=S.settings.meds[+b.dataset.mdel];
@@ -1237,16 +1263,109 @@ function viewArchivedReport(idx){
  }finally{S=live}
  doPrint(html,false);
 }
+const plainObject=value=>value!==null&&typeof value==='object'&&!Array.isArray(value)&&Object.getPrototypeOf(value)===Object.prototype;
+const optionalDate=value=>value==null||value===''||validISODate(value);
+const validMedication=med=>plainObject(med)&&
+ (med.startedAt===null||validISODate(med.startedAt))&&
+ (med.stoppedAt===null||validISODate(med.stoppedAt))&&
+ (med.startedAt===null||med.stoppedAt===null||med.stoppedAt>med.startedAt);
+function validateBackupShape(data){
+ if(!plainObject(data)||!plainObject(data.settings)||!plainObject(data.days))return false;
+ if('dataVersion' in data&&(!Number.isInteger(data.dataVersion)||data.dataVersion<0))return false;
+ for(const key of ['weeks','labDates','refRead'])if(key in data&&!plainObject(data[key]))return false;
+ for(const key of ['labs','doseChanges','archive'])if(key in data&&!Array.isArray(data[key]))return false;
+ for(const key of ['alerts'])if(key in data.settings&&!plainObject(data.settings[key]))return false;
+ for(const key of ['meds','carbGoalHistory','alertHistory'])if(key in data.settings&&!Array.isArray(data.settings[key]))return false;
+ return true;
+}
+function validatePreparedBackup(data){
+ return validateBackupShape(data)&&validISODate(data.settings.start)&&
+  optionalDate(data.settings.lastBackup)&&
+  ['weeks','labDates','refRead'].every(key=>plainObject(data[key]))&&
+  ['labs','doseChanges','archive'].every(key=>Array.isArray(data[key]))&&
+  ['meds','carbGoalHistory','alertHistory'].every(key=>Array.isArray(data.settings[key]))&&
+  ['base','end'].every(key=>optionalDate(data.labDates[key]))&&
+  Object.values(data.days).every(day=>plainObject(day)&&(day.sym==null||Array.isArray(day.sym)))&&
+  Object.values(data.weeks).every(plainObject)&&
+  data.labs.every(plainObject)&&data.doseChanges.every(plainObject)&&
+  data.archive.every(entry=>plainObject(entry)&&validISODate(entry.archivedAt))&&
+  data.settings.meds.every(validMedication);
+}
+function prepareBackup(data){
+ if(!validateBackupShape(data))return {error:'shape'};
+ if((data.dataVersion||0)>DATA_VERSION)return {error:'future'};
+ try{
+  const prepared=migrate(JSON.parse(JSON.stringify(data)));
+  return validatePreparedBackup(prepared)?{prepared}:{error:'shape'};
+ }catch(e){return {error:'migration'}}
+}
+function readRecovery(){
+ try{
+  const raw=localStorage.getItem(RECOVERY_KEY);
+  if(!raw)return null;
+  const wrapper=JSON.parse(raw);
+  if(!plainObject(wrapper)||typeof wrapper.createdAt!=='string'||!Number.isFinite(Date.parse(wrapper.createdAt)))return null;
+  const result=prepareBackup(wrapper.data);
+  return result.prepared?{createdAt:wrapper.createdAt,prepared:result.prepared}:null;
+ }catch(e){return null}
+}
+function createRecovery(){
+ try{localStorage.setItem(RECOVERY_KEY,JSON.stringify({createdAt:new Date().toISOString(),data:S}));return true}
+ catch(e){return false}
+}
+function replaceLiveState(prepared,failureMessage){
+ const live=S;
+ try{
+  S=prepared;
+  syncCurrentSettings();
+  if(persistState())return true;
+ }catch(e){}
+ S=live;
+ status(failureMessage);
+ return false;
+}
+function restoreRecovery(){
+ const recovery=readRecovery();
+ if(!recovery){status('Keine gültige Sicherheitskopie gefunden');renderSet();return}
+ if(!confirm('Vorherige Daten wiederherstellen? Die aktuellen Browserdaten werden ersetzt.'))return;
+ if(!replaceLiveState(recovery.prepared,'Wiederherstellen fehlgeschlagen – aktuelle Daten bleiben erhalten'))return;
+ let removed=true;
+ try{localStorage.removeItem(RECOVERY_KEY)}catch(e){removed=false}
+ renderAll();
+ status(removed?'Vorherige Daten wiederhergestellt':'Daten wiederhergestellt – Sicherheitskopie konnte nicht gelöscht werden');
+}
+function deleteRecovery(){
+ if(!confirm('Lokale Sicherheitskopie löschen? Die aktuellen Daten bleiben erhalten.'))return;
+ try{localStorage.removeItem(RECOVERY_KEY);renderSet();status('Sicherheitskopie gelöscht')}
+ catch(e){status('Sicherheitskopie konnte nicht gelöscht werden')}
+}
+function importSummary(data,version){
+ const name=typeof data.settings.name==='string'&&data.settings.name.trim()?data.settings.name.trim():'ohne Name';
+ const start=validISODate(data.settings.start)?data.settings.start:'nicht angegeben';
+ const logged=Object.values(data.days).filter(day=>plainObject(day)&&Object.keys(day).length).length;
+ const archived=Array.isArray(data.archive)?data.archive.length:0;
+ return `Backup laden?\nName: ${name}\nStart: ${start}\nErfasste Tage: ${logged}\nArchivierte Durchgänge: ${archived}\nDatenversion: ${version}\n\nDie aktuellen Browserdaten werden ersetzt. Zuvor wird eine lokale Sicherheitskopie erstellt.`;
+}
 $('#importFile').addEventListener('change',e=>{
- const file=e.target.files[0];if(!file)return;const r=new FileReader();
- r.onload=()=>{try{
-  const d=JSON.parse(r.result);
-  if(!d.settings||!d.days)throw 0;
-  if((d.dataVersion||0)>DATA_VERSION){status('Backup stammt aus einer neueren App-Version — bitte zuerst die App aktualisieren.');return}
-  if(!confirm('Backup laden? Die aktuellen Daten in diesem Browser werden ersetzt.'))return;
-  S=migrate(d);syncCurrentSettings();save('Backup geladen');renderAll()
- }catch(err){status('Datei ist kein gültiges Backup')}e.target.value=''};
- r.readAsText(file);
+ const input=e.target,file=input.files[0];
+ if(!file){input.value='';return}
+ const reader=new FileReader();
+ reader.onload=()=>{try{
+  let data;
+  try{data=JSON.parse(reader.result)}catch(err){status('Datei ist kein gültiges JSON-Backup');return}
+  const result=prepareBackup(data);
+  if(result.error==='future'){status('Backup stammt aus einer neueren App-Version — bitte zuerst die App aktualisieren.');return}
+  if(result.error==='migration'){status('Backup konnte nicht verarbeitet werden');return}
+  if(result.error){status('Backup hat ein ungültiges Datenformat');return}
+  const version=data.dataVersion??'nicht angegeben';
+  if(!confirm(importSummary(result.prepared,version)))return;
+  if(!createRecovery()){status('Sicherheitskopie konnte nicht erstellt werden – Backup nicht geladen');return}
+  if(!replaceLiveState(result.prepared,'Backup konnte nicht gespeichert werden – aktuelle Daten bleiben erhalten'))return;
+  renderAll();status('Backup geladen');
+ }finally{input.value=''}};
+ reader.onerror=()=>{status('Backup-Datei konnte nicht gelesen werden');input.value=''};
+ reader.onabort=()=>{status('Backup-Laden abgebrochen');input.value=''};
+ try{reader.readAsText(file)}catch(err){status('Backup-Datei konnte nicht gelesen werden');input.value=''}
 });
 
 /* ---------- literature ---------- */
@@ -1281,6 +1400,25 @@ document.querySelector('nav').addEventListener('click',e=>{const b=e.target.clos
 $('#strip').addEventListener('click',e=>{const b=e.target.closest('[data-date]');if(!b)return;curDate=b.dataset.date;show('day')});
 $('#nudge').addEventListener('click',e=>{if(e.target.dataset.goto)show(e.target.dataset.goto)});
 function renderAll(){curWeek=Math.min(nWeeks(),Math.max(1,weekOf(today())));show(curTab)}
+
+const pendingEdits=new WeakSet();
+const autosaveField=el=>el&&(el instanceof HTMLInputElement||el instanceof HTMLTextAreaElement)&&el.isConnected&&!el.disabled&&!el.readOnly&&el.type!=='file'&&el.closest('#v-day,#v-week,#v-lab,#v-print,#v-set');
+document.addEventListener('input',e=>{if(autosaveField(e.target))pendingEdits.add(e.target)});
+document.addEventListener('change',e=>pendingEdits.delete(e.target));
+function flushPendingEdit(){
+ // Preserve a newer external write, such as one made by another tab.
+ try{if(localStorage.getItem(KEY)!==lastPersistedRaw)return false}catch(e){return false}
+ const active=document.activeElement;
+ if(autosaveField(active)&&pendingEdits.has(active)){
+  pendingEdits.delete(active);
+  active.dispatchEvent(new Event('change',{bubbles:true}));
+ }
+ return persistState();
+}
+window.addEventListener('pagehide',flushPendingEdit);
+document.addEventListener('visibilitychange',()=>{
+ if(document.visibilityState==='hidden')flushPendingEdit();
+});
 
 $('#verline').textContent='v'+VERSION;
 load();renderAll();
