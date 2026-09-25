@@ -74,6 +74,58 @@ test.describe('Print output', () => {
     expect(labels[1]).toContain('20 mg');
   });
 
+  test('fridge sheet shows within-week goal and threshold changes and still fits A4 landscape', async ({ page }) => {
+    await gotoApp(page);
+    const start = '2026-09-07', change = '2026-09-10';
+    const old = { ...blankState().settings.alerts, gMax: 180, action: 'Old action' };
+    const next = { ...blankState().settings.alerts, gMax: 160, action: 'New action' };
+    const meds = Array.from({ length: 6 }, (_, i) => ({ id: `med${i}`, name: `Synthetic med ${i}`, dose: '10 mg', category: 'Medikament' }));
+    const state = blankState({ settings: { ...blankState().settings, start, days: 14, carbGoal: 30, alerts: next, meds,
+      carbGoalHistory: [{ date: null, value: 50 }, { date: change, value: 30 }],
+      alertHistory: [{ date: null, value: old }, { date: change, value: next }] } });
+    for (let i = 0; i < 7; i++) state.days[addDays(start, i)] = {
+      w: 80, g: 95, k: 0.8, sys1: 120, dia1: 80, sys2: 118, dia2: 78,
+      c: 40, en: 3, hu: 3, plan: 'y', meds: Object.fromEntries(meds.map(m => [m.id, true])),
+    };
+    await seed(page, state);
+    const html = await page.evaluate(() => sheetHTML(1, true));
+    expect(html).toContain('g, Limit 50 → 30 g');
+    expect(html).toContain('07.09.');
+    expect(html).toContain('ab 10.09.');
+    expect(html).toContain('BZ ––180');
+    expect(html).toContain('BZ ––160');
+    expect(html).toContain('Old action');
+    expect(html).toContain('New action');
+
+    const contentW = mmToPx(277), contentH = mmToPx(190);
+    await page.setViewportSize({ width: Math.round(contentW), height: Math.round(contentH) + 400 });
+    await page.emulateMedia({ media: 'print' });
+    await page.evaluate((w) => {
+      document.getElementById('print').innerHTML = sheetHTML(1, true);
+      document.querySelector('.sheet').style.width = w + 'px';
+    }, contentW);
+    await page.waitForTimeout(100);
+    const height = await page.locator('.sheet').evaluate(el => el.getBoundingClientRect().height);
+    expect(height).toBeLessThanOrEqual(contentH);
+  });
+
+  test('fridge sheet for a historical week uses only that week\'s goal and thresholds', async ({ page }) => {
+    await gotoApp(page);
+    const start = '2026-09-07', change = '2026-09-14';
+    const old = { ...blankState().settings.alerts, gMax: 180 };
+    const next = { ...blankState().settings.alerts, gMax: 160 };
+    await seed(page, blankState({ settings: { ...blankState().settings, start, days: 14, carbGoal: 30, alerts: next,
+      carbGoalHistory: [{ date: null, value: 50 }, { date: change, value: 30 }],
+      alertHistory: [{ date: null, value: old }, { date: change, value: next }] } }));
+    const sheets = await page.evaluate(() => [sheetHTML(1, false), sheetHTML(2, false)]);
+    expect(sheets[0]).toContain('g, Limit 50 g');
+    expect(sheets[0]).toContain('BZ ––180');
+    expect(sheets[0]).not.toContain('BZ ––160');
+    expect(sheets[1]).toContain('g, Limit 30 g');
+    expect(sheets[1]).toContain('BZ ––160');
+    expect(sheets[1]).not.toContain('BZ ––180');
+  });
+
   test('report renders every section including Quellen', async ({ page }) => {
     await gotoApp(page);
     const start = addDays(today(), -60);
