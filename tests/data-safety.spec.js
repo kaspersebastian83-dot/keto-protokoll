@@ -198,11 +198,9 @@ test.describe('Single migration path (Part C)', () => {
     }));
     await page.click('nav button[data-tab="set"]');
 
-    const sameVersionBackup = JSON.stringify({
-      dataVersion: 5,
-      settings: { name: 'Imported Patient', start: today(), days: 90, carbGoal: 50, questions: '', lastBackup: null, meds: [] },
-      days: {},
-    });
+    const sameVersionBackup = JSON.stringify(blankState({
+      settings: { ...blankState().settings, name: 'Imported Patient' },
+    }));
     page.once('dialog', (d) => d.accept());
     await page.setInputFiles('#importFile', { name: 'same-version-backup.json', mimeType: 'application/json', buffer: Buffer.from(sameVersionBackup) });
 

@@ -6,7 +6,7 @@ test.describe('Backup export/import', () => {
     await gotoApp(page);
     const state = blankState({
       settings: { name: 'Test Patient', start: today(), days: 90, carbGoal: 45, questions: 'Testfrage?', lastBackup: null,
-        meds: [{ id: 'medA', name: 'Testmed A', dose: '10 mg', category: 'Medikament' }] },
+        meds: [{ id: 'medA', name: 'Testmed A', dose: '10 mg', category: 'Medikament', startedAt: null, stoppedAt: null }] },
       days: { [today()]: { w: 80, g: 95 } },
     });
     await seed(page, state);
@@ -23,7 +23,7 @@ test.describe('Backup export/import', () => {
 
     const restored = await page.evaluate(() => ({ name: S.settings.name, meds: S.settings.meds, days: S.days }));
     expect(restored.name).toBe('Test Patient');
-    expect(restored.meds).toEqual([{ id: 'medA', name: 'Testmed A', dose: '10 mg', category: 'Medikament' }]);
+    expect(restored.meds).toEqual([{ id: 'medA', name: 'Testmed A', dose: '10 mg', category: 'Medikament', startedAt: null, stoppedAt: null }]);
     expect(restored.days[today()]).toEqual({ w: 80, g: 95 });
   });
 
