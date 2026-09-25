@@ -48,7 +48,7 @@ test.describe('Backup export/import', () => {
     }));
 
     expect(migrated).toEqual({
-      dataVersion: 3, weeks: {}, labDates: { base: expect.any(String), end: '' }, meds: [],
+      dataVersion: 4, weeks: {}, labDates: { base: expect.any(String), end: '' }, meds: [],
       doseChanges: [], archive: [], refRead: {},
     });
     expect(errors).toEqual([]);
