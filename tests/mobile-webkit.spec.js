@@ -1,5 +1,5 @@
 const { test, expect } = require('@playwright/test');
-const { gotoApp, seed, blankState, today } = require('./helpers');
+const { gotoApp, seed, blankState, today, addDays } = require('./helpers');
 
 test.describe('iPhone-sized WebKit smoke checks', () => {
   test('Today loads without a page error and daily entries survive reload', async ({ page }) => {
@@ -123,5 +123,22 @@ test.describe('iPhone-sized WebKit smoke checks', () => {
     await expect(page.locator('#todayExtraSummary')).toContainText('1 eingetragen');
     await page.locator('#todayExtraSummary').tap();
     await expect(page.locator('#f_g')).toHaveValue('94');
+  });
+
+  test('weekly check-in card opens the existing Week form and a value survives reload', async ({ page }) => {
+    await gotoApp(page);
+    await seed(page, blankState({ settings: { start: addDays(today(), -6), days: 14 } }));
+    await expect(page.locator('.weekly-checkin-card')).toContainText('Woche 1');
+    await page.getByRole('button', { name: 'Wochen-Check-in öffnen' }).tap();
+    await expect(page.locator('#v-week')).toBeVisible();
+    await expect(page.locator('#wsel')).toHaveValue('1');
+    await page.locator('#w_waist').tap();
+    await page.locator('#w_waist').fill('84');
+    await page.locator('#w_note').tap();
+    await page.reload();
+    await page.getByRole('button', { name: 'Wochen-Check-in öffnen' }).tap();
+    await expect(page.locator('#wsel')).toHaveValue('1');
+    await expect(page.locator('#w_waist')).toHaveValue('84');
+    expect(await page.evaluate(() => document.documentElement.scrollWidth - document.documentElement.clientWidth)).toBeLessThanOrEqual(2);
   });
 });
