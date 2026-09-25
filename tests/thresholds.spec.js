@@ -51,6 +51,7 @@ test.describe('Doctor-agreed alert thresholds', () => {
     await expect(page.locator(`.strip button[data-date="${today()}"] .alert-dot`)).toHaveCount(0);
 
     // Cross the limit.
+    await page.locator('[data-today-measurement="g"] summary').click();
     await page.fill('#f_g', '210');
     await page.locator('#f_g').blur();
     await expect(page.locator('#alertWarn')).toBeVisible();
@@ -59,6 +60,7 @@ test.describe('Doctor-agreed alert thresholds', () => {
     await expect(page.locator(`.strip button[data-date="${today()}"] .alert-dot`)).toHaveCount(1);
 
     // Back inside the limit.
+    await page.locator('[data-today-measurement="g"] summary').click();
     await page.fill('#f_g', '150');
     await page.locator('#f_g').blur();
     await expect(page.locator('#alertWarn')).toHaveCount(0);

@@ -49,6 +49,7 @@ test.describe('Mobile lifecycle autosave', () => {
   test('invalid focused numeric text does not replace the previously stored valid value', async ({ page }) => {
     await gotoApp(page);
     await seed(page, blankState({ days: { [today()]: { w: 80 } } }));
+    await page.locator('[data-today-measurement="w"] summary').click();
     await page.fill('#f_w', 'invalid');
     await page.evaluate(() => window.dispatchEvent(new Event('pagehide')));
     expect(await page.evaluate(() => JSON.parse(localStorage.getItem(KEY)).days[today()].w)).toBe(80);

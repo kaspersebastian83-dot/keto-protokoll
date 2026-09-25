@@ -14,6 +14,7 @@ test.describe('iPhone-sized WebKit smoke checks', () => {
     await page.locator('#f_w').fill('82');
     await page.locator('#f_note').tap();
     await page.locator('#f_note').fill('Synthetic mobile note');
+    await page.locator('[data-today-measurement="w"] summary').tap();
     await page.locator('#f_w').tap();
     expect(await page.evaluate(() => S.days[today()])).toMatchObject({ w: 82, note: 'Synthetic mobile note' });
 
@@ -102,5 +103,25 @@ test.describe('iPhone-sized WebKit smoke checks', () => {
     await expect(page.locator('#ms_k')).toHaveValue('weekdays');
     expect(await page.evaluate(() => S.settings.measurementSchedule.k.weekdays)).toEqual(expected);
     await expect(page.locator(`[data-ms-id="k"][data-ms-day="${other}"]`)).toHaveAttribute('aria-pressed', 'true');
+  });
+
+  test('quick Today exposes non-due values through touch without overflow', async ({ page }) => {
+    const state = blankState();
+    state.settings.measurementSchedule.g = { mode: 'optional', weekdays: [] };
+    await gotoApp(page);
+    await seed(page, state);
+    await expect(page.locator('#todayDue #f_w')).toBeVisible();
+    await expect(page.locator('#todayDue #f_g')).toHaveCount(0);
+    await page.locator('#todayExtraSummary').tap();
+    await expect(page.locator('#todayExtra #f_g')).toBeVisible();
+    await page.locator('#f_g').tap();
+    await page.locator('#f_g').fill('94');
+    await page.locator('#f_g').blur();
+    await expect(page.locator('#todayExtraSummary')).toContainText('1 eingetragen');
+    expect(await page.evaluate(() => document.documentElement.scrollWidth - document.documentElement.clientWidth)).toBeLessThanOrEqual(2);
+    await page.reload();
+    await expect(page.locator('#todayExtraSummary')).toContainText('1 eingetragen');
+    await page.locator('#todayExtraSummary').tap();
+    await expect(page.locator('#f_g')).toHaveValue('94');
   });
 });
