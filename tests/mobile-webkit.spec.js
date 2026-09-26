@@ -245,7 +245,40 @@ test.describe('iPhone-sized WebKit smoke checks', () => {
     expect(await page.evaluate(() => document.documentElement.scrollWidth - document.documentElement.clientWidth)).toBeLessThanOrEqual(2);
     await expect(page.locator('#v-trend .chart').first()).toBeVisible();
     const order = await page.locator('#v-trend > *').evaluateAll(nodes => nodes.map(node => node.id||node.querySelector('h2')?.textContent));
-    expect(order.slice(0,2)).toEqual(['experimentOverview','dataBasis']);
+    expect(order.slice(0,3)).toEqual(['experimentOverview','experimentSummary','dataBasis']);
+    await expect(page.locator('#cmpA')).toBeVisible();
+    await expect(page.locator('#cmpB')).toBeVisible();
+    await page.locator('#cmpA').selectOption('w');
+    await expect(page.locator('#cmpChart')).toContainText('Gewicht');
+  });
+
+  test('experiment summary rows wrap on phone width and leave charts reachable', async ({ page }) => {
+    const start = addDays(today(), -20);
+    const days = Object.fromEntries([0, 7, 14].map((offset, i) =>
+      [addDays(start, offset), { sys: 130 - i * 2, dia: 82 - i, w: 82 - i }]));
+    await gotoApp(page);
+    await seed(page, blankState({ settings: { ...blankState().settings, start, days: 28 }, days }));
+    await page.locator('nav button[data-tab="trend"]').tap();
+    const summary = page.locator('#experimentSummary');
+    await expect(summary).toBeVisible();
+    await expect(summary.locator('[data-summary="sys"]')).toBeVisible();
+    const width = page.viewportSize().width;
+    const boxes = await summary.locator('.summary-row').evaluateAll(nodes => nodes.map(node => {
+      const box = node.getBoundingClientRect();
+      return { left: box.left, right: box.right };
+    }));
+    expect(boxes.length).toBeGreaterThan(0);
+    for (const box of boxes) {
+      expect(box.left).toBeGreaterThanOrEqual(-1);
+      expect(box.right).toBeLessThanOrEqual(width + 1);
+    }
+    const heading = summary.locator('[data-summary="sys"] h3');
+    await heading.evaluate(el => { el.style.maxWidth = '130px'; });
+    expect(await heading.evaluate(el => el.getBoundingClientRect().height > parseFloat(getComputedStyle(el).lineHeight))).toBe(true);
+    expect(await page.evaluate(() => document.documentElement.scrollWidth - document.documentElement.clientWidth)).toBeLessThanOrEqual(2);
+    const order = await page.locator('#v-trend > *').evaluateAll(nodes => nodes.map(node => node.id || node.querySelector('h2')?.textContent));
+    expect(order.slice(0,3)).toEqual(['experimentOverview','experimentSummary','dataBasis']);
+    await expect(page.locator('#v-trend .chart').first()).toBeVisible();
     await expect(page.locator('#cmpA')).toBeVisible();
     await expect(page.locator('#cmpB')).toBeVisible();
     await page.locator('#cmpA').selectOption('w');
