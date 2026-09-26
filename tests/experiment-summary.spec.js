@@ -165,7 +165,7 @@ test.describe('Experiment summary in Verlauf', () => {
       [addDays(start, 14)]: { c: 50, k: 1.2 },
     } }));
     const children = await page.locator('#v-trend > *').evaluateAll(nodes => nodes.map(node => node.id || node.querySelector('h2')?.textContent));
-    expect(children.slice(0,3)).toEqual(['experimentOverview','experimentSummary','dataBasis']);
+    expect(children.slice(0,4)).toEqual(['experimentOverview','experimentSummary','historicalComparison','dataBasis']);
     expect(children.at(-1)).toBe('Vergleich zweier Werte');
     const captions = await page.locator('#v-trend .chart figcaption').allTextContents();
     for (const label of ['Gewicht','Blutzucker nüchtern','Ketone','Blutdruck','Kohlenhydrate',
@@ -193,6 +193,6 @@ test.describe('Experiment summary in Verlauf', () => {
   test('release version and unchanged schema and keys are exposed', async ({ page }) => {
     await gotoApp(page);
     expect(await page.evaluate(() => ({ version: VERSION, schema: DATA_VERSION, key: KEY, recovery: RECOVERY_KEY })))
-      .toEqual({ version: '1.7.1', schema: 6, key: 'ketoProtokoll_v1', recovery: 'ketoProtokoll_recovery_v1' });
+      .toEqual({ version: '1.7.2', schema: 6, key: 'ketoProtokoll_v1', recovery: 'ketoProtokoll_recovery_v1' });
   });
 });

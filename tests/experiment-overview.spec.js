@@ -150,7 +150,8 @@ test.describe('Experiment overview and data basis', () => {
     const sectionOrder = await page.locator('#v-trend > *').evaluateAll(nodes => nodes.map(node => node.id||node.querySelector('h2')?.textContent||''));
     expect(sectionOrder[0]).toBe('experimentOverview');
     expect(sectionOrder[1]).toBe('experimentSummary');
-    expect(sectionOrder[2]).toBe('dataBasis');
+    expect(sectionOrder[2]).toBe('historicalComparison');
+    expect(sectionOrder[3]).toBe('dataBasis');
     expect(sectionOrder.at(-1)).toBe('Vergleich zweier Werte');
   });
 
@@ -167,9 +168,9 @@ test.describe('Experiment overview and data basis', () => {
       recovery: localStorage.getItem(RECOVERY_KEY) }))).toEqual(before);
   });
 
-  test('release and storage metadata remain synchronized at version 1.7.1', async ({ page }) => {
+  test('release and storage metadata remain synchronized at version 1.7.2', async ({ page }) => {
     await gotoApp(page);
     expect(await page.evaluate(() => ({ version: VERSION, schema: DATA_VERSION, key: KEY, recovery: RECOVERY_KEY })))
-      .toEqual({ version: '1.7.1', schema: 6, key: 'ketoProtokoll_v1', recovery: 'ketoProtokoll_recovery_v1' });
+      .toEqual({ version: '1.7.2', schema: 6, key: 'ketoProtokoll_v1', recovery: 'ketoProtokoll_recovery_v1' });
   });
 });
