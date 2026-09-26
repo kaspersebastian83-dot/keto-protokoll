@@ -105,6 +105,8 @@ Includes:
 
 Blood pressure supports two morning measurements and derives a daily value for existing charts, trends, reports and alerts.
 
+The five objective morning measurements can be scheduled daily, on selected weekdays, or marked optional. On the actual current day, Today emphasizes scheduled measurements, shows their completion count, and lets completed entries collapse into accessible disclosures. Non-due measurements remain available under additional measurements. Historical and future dates retain the full-entry layout.
+
 ### Weekly tracking
 
 Includes weekly and Garmin-related measurements such as:
@@ -115,6 +117,8 @@ Includes weekly and Garmin-related measurements such as:
 - stress
 - steps
 - notes
+
+When due, Today can remind the user about the current or recent weekly check-in and link to the existing Week form. It does not duplicate that form.
 
 ### Laboratory tracking
 
@@ -129,11 +133,14 @@ Supports:
 
 Includes:
 
-- longitudinal charts
-- linear trend calculations
-- two-variable comparison chart
-- summary tables
-- observations generated from recorded data
+- seven longitudinal charts and the existing linear trend calculations
+- an experiment overview with elapsed-period status and data-quality/data-basis summaries
+- trend-readiness information and a modeled trend summary for the current period across the same 14 numerical metrics
+- historical comparison of the current period with an archived period
+- the existing two-variable comparison chart
+- descriptive observations from recorded data to support doctor discussion
+
+Modeled endpoints are descriptive estimates, not individual first or last readings. Historical comparison does not rank periods. These summaries do not claim statistical significance or causation.
 
 ### Medication tracking
 
@@ -172,15 +179,17 @@ Includes:
 - schema migration
 - backup reminders
 - persistent-storage request where supported
+- a browser-local recovery snapshot around backup import, with lifecycle-safe import and recovery behavior
 
 ### Tracking periods
 
 Users can:
 
 - extend a current period
-- archive a completed period
+- archive a period
 - start a new period
 - regenerate reports for archived periods
+- compare the current period descriptively with an archived period
 
 ### Literature
 
@@ -212,6 +221,13 @@ Important coverage includes:
 - backup and restore
 - data migration
 - period handling
+- measurement scheduling
+- Today completion behavior
+- weekly check-in reminders
+- experiment overview and data-quality summaries
+- experiment trend summaries
+- historical period comparison
+- archive migration and archived reports
 - trend calculations
 - comparison charts
 - literature
@@ -259,7 +275,7 @@ Preferred workflow:
 
 ## Current development priorities
 
-### Priority 0 — Project infrastructure
+### Priority 0 — Project infrastructure — COMPLETE
 
 - [x] Add `AGENTS.md`
 - [x] Add `PROJECT.md`
@@ -267,18 +283,46 @@ Preferred workflow:
 - [x] Review obsolete development branches
 - [x] Adopt feature-branch and pull-request workflow
 
-### Future development
+### P1 — Historical correctness and data safety — COMPLETE
 
-Future features should be defined before implementation.
+Established privacy and release safeguards, archived-state migration, medication lifecycle history, dated goals and doctor-agreed thresholds, backup and recovery hardening, and WebKit/mobile regression coverage.
 
-Potential areas include:
+### P2 — Measurement schedule and low-friction Today UX — COMPLETE
 
-- improved longitudinal summaries
-- better experiment-level overview
-- improved daily-entry UX
-- data-quality indicators
-- historical period comparison
-- accessibility improvements
-- continued mobile refinement
+Added configurable measurement schedules, the schedule-aware Today view, the weekly check-in reminder, and mobile/accessibility polish.
 
-These are ideas, not committed requirements.
+### P3 — Experiment overview and longitudinal summaries — COMPLETE
+
+- P3.1: experiment overview and data-quality foundation
+- P3.2: current-period trend summary
+- P3.3: historical period comparison
+
+P3 provides descriptive analysis only. It does not add diagnostic, causal, ranking, or health-scoring behavior.
+
+### P4 — Analysis presentation and comparison UX — PLANNED
+
+Purpose: improve how existing analysis is presented and explored without changing the underlying health interpretation model.
+
+#### P4.1 — Chart readability and context
+
+Potential goals include clearer chart titles, units, legends, and empty states; consistent observation-range and data-basis context; improved narrow-screen readability and accessibility; and a clearer distinction between raw observations and modeled trends. No new statistical models are proposed.
+
+#### P4.2 — Historical comparison visualization
+
+Potential goals include visual presentation of current and archived-period trends using P3.3 period and cutoff semantics. The presentation should avoid winner/better/worse framing and should not imply equal observation windows when they differ. This is a visualization extension of P3.3, not new medical analysis.
+
+#### P4.3 — Two-variable comparison UX
+
+Potential goals include improving the existing Wert A / Wert B workflow, selected-variable context, axis and unit labels, mobile presentation, and empty or insufficient-data states. Correlation coefficients, significance testing, and causal interpretation are out of scope; they would require a separately defined evidence/statistics phase.
+
+#### P4.4 — Analysis accessibility and final polish
+
+Potential goals include keyboard and accessibility review, responsive behavior, screen-reader-friendly labels, print/screen consistency where relevant, and consistency across overview, summary, charts, and comparison views.
+
+P4 is a roadmap direction. Each subphase must be inspected and scoped before implementation. These bullets are not committed requirements.
+
+### Later possibilities
+
+Uncommitted possibilities include an evidence/library refresh, onboarding/help improvements, import/convenience features, continued mobile refinement, and optional deeper statistical analysis only after explicit statistical and medical design review.
+
+The project does not promise diagnosis, personalized treatment advice, automatic health scoring, causal inference, or predictive disease models.
