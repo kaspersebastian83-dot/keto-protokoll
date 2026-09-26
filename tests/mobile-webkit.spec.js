@@ -315,6 +315,17 @@ test.describe('iPhone-sized WebKit smoke checks', () => {
     const sides = await panel.locator('[data-compare="sys"] .period-side').evaluateAll(nodes =>
       nodes.map(node => ({ y: node.getBoundingClientRect().y, bottom: node.getBoundingClientRect().bottom })));
     expect(sides[1].y).toBeGreaterThanOrEqual(sides[0].bottom - 1);
+    await expect(panel.locator('[data-compare="sys"] .comparison-value-track')).toHaveCount(2);
+    await expect(panel).toContainText('130 → 126 mmHg');
+    const trackBoxes = await panel.locator('.comparison-value-track').evaluateAll(nodes => nodes.map(node => {
+      const track = node.getBoundingClientRect(), card = node.closest('.period-side').getBoundingClientRect();
+      return { trackLeft: track.left, trackRight: track.right, cardLeft: card.left, cardRight: card.right };
+    }));
+    for (const box of trackBoxes) {
+      expect(box.trackLeft).toBeGreaterThanOrEqual(box.cardLeft - 1);
+      expect(box.trackRight).toBeLessThanOrEqual(box.cardRight + 1);
+    }
+    expect(await panel.evaluate(el => getComputedStyle(el).overflowX)).not.toBe('auto');
     expect(await page.evaluate(() => document.documentElement.scrollWidth - document.documentElement.clientWidth)).toBeLessThanOrEqual(2);
     const order = await page.locator('#v-trend > *').evaluateAll(nodes => nodes.map(node => node.id || node.querySelector('h2')?.textContent));
     expect(order.slice(0,4)).toEqual(['experimentOverview','experimentSummary','historicalComparison','dataBasis']);

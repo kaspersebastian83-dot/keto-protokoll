@@ -2,7 +2,7 @@
 //
 // Keep CACHE_NAME's version synchronized with index.html, package.json, and
 // package-lock.json so each release replaces the old service-worker cache.
-const CACHE_NAME = 'keto-protokoll-v1.7.3';
+const CACHE_NAME = 'keto-protokoll-v1.7.4';
 
 const PRECACHE_URLS = [
   './index.html',

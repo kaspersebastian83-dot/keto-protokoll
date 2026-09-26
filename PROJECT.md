@@ -307,7 +307,7 @@ Purpose: improve how existing analysis is presented and explored without changin
 
 The seven fixed Verlauf charts now show titles, units, plotted-value counts, configured-period and observation context, clearer empty states, a non-color BP series distinction, readable narrow-screen chart scrolling, and accessible descriptions. Chart mathematics and medical interpretation are unchanged.
 
-#### P4.2 — Historical comparison visualization — PLANNED
+#### P4.2 — Historical comparison visualization — COMPLETE
 
 Potential goals include visual presentation of current and archived-period trends using P3.3 period and cutoff semantics. The presentation should avoid winner/better/worse framing and should not imply equal observation windows when they differ. This is a visualization extension of P3.3, not new medical analysis.
 

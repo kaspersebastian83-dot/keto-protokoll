@@ -135,6 +135,12 @@ td.num,th.num{text-align:right}
 .period-side h4{font-size:.85rem;font-weight:500;color:var(--muted);margin:0 0 4px}
 .period-side p{margin:0}
 .period-side .summary-basis{margin-top:2px}
+.comparison-value-track{display:block;width:100%;height:28px;margin:5px 0;overflow:visible}
+.comparison-value-track .track-guide{stroke:var(--line);stroke-width:1}
+.comparison-value-track .track-connector{stroke:var(--muted);stroke-width:2;fill:none}
+.comparison-value-track.archive .track-connector{stroke-dasharray:5 4}
+.comparison-value-track .track-start{fill:var(--paper);stroke:var(--muted);stroke-width:2}
+.comparison-value-track .track-end{fill:var(--muted);stroke:var(--muted);stroke-width:2}
 .historical-comparison label{display:block;font-weight:500;margin:10px 0 4px}
 .historical-comparison select{min-height:44px;max-width:100%}
 .historical-comparison .sub{overflow-wrap:anywhere}
@@ -285,7 +291,7 @@ td.num,th.num{text-align:right}
 <script>
 const KEY='ketoProtokoll_v1';
 const RECOVERY_KEY='ketoProtokoll_recovery_v1';
-const VERSION='1.7.3'; // keep in sync with package.json, package-lock.json, and sw.js
+const VERSION='1.7.4'; // keep in sync with package.json, package-lock.json, and sw.js
 const SYMS=['Kopfschmerz','Müdigkeit','Muskelkrämpfe','Verdauung','Schwindel','Schlecht geschlafen','Heißhunger','Herzklopfen','Gereizt'];
 const DEFAULT_LABS=[['HbA1c','%'],['Glukose nüchtern','mg/dl'],['Gesamtcholesterin','mg/dl'],['LDL-Cholesterin','mg/dl'],['HDL-Cholesterin','mg/dl'],['Triglyzeride','mg/dl'],['Harnsäure','mg/dl'],['Kreatinin','mg/dl'],['eGFR','ml/min'],['GPT (ALT)','U/l'],['GOT (AST)','U/l'],['Gamma-GT','U/l'],['Natrium','mmol/l'],['Kalium','mmol/l'],['Magnesium','mmol/l'],['TSH','mU/l'],['CRP','mg/l']];
 const REFERENCES=[
@@ -1210,12 +1216,51 @@ function experimentPeriodComparison(currentState,entry,asOf=today()){
  return {archivedAsOf,rows:SUMMARY_METRICS.map(([,id])=>({id,current:currentRows.get(id)||null,
   archived:archivedRows.get(id)||null})).filter(row=>row.current||row.archived)};
 }
-function comparisonSideHTML(row,title,side){
+function comparisonVisualScale(values,digits){
+ const finite=values.filter(Number.isFinite);
+ if(!finite.length)return null;
+ const rawStep=10**(-digits),step=Number.isFinite(rawStep)&&rawStep>0?rawStep:1;
+ const magnitude=Math.max(...finite.map(Math.abs));
+ const normalizer=Math.max(magnitude,step,Number.MIN_VALUE);
+ const normalized=finite.map(value=>value/normalizer);
+ const low=Math.min(...normalized),high=Math.max(...normalized);
+ const span=Math.max(high-low,(step/normalizer)*10,(magnitude/normalizer)*.10);
+ const center=low+(high-low)/2,padding=span*.10;
+ return {normalizer,min:center-span/2-padding,max:center+span/2+padding};
+}
+function comparisonVisualPosition(value,scale){
+ // Generated normalized scales stay within ±7 and have a span of at least .12.
+ if(!Number.isFinite(value)||!scale||!Number.isFinite(scale.normalizer)||scale.normalizer<=0||
+    !Number.isFinite(scale.min)||!Number.isFinite(scale.max)||scale.min< -8||scale.max>8||
+    scale.max<=scale.min||Math.abs(value)>scale.normalizer)return null;
+ const normalized=value/scale.normalizer,denominator=scale.max-scale.min;
+ if(!Number.isFinite(normalized)||!Number.isFinite(denominator)||denominator<.1)return null;
+ const ratio=(normalized-scale.min)/denominator;
+ if(!Number.isFinite(ratio)||ratio< -Number.EPSILON*8||ratio>1+Number.EPSILON*8)return null;
+ const position=14+ratio*272;
+ return Number.isFinite(position)?Math.max(14,Math.min(286,position)):null;
+}
+function historicalComparisonVisualHTML(row){
+ const values=[row.current?.start,row.current?.end,row.archived?.start,row.archived?.end];
+ const digits=row.current?.digits??row.archived?.digits;
+ const scale=comparisonVisualScale(values,digits);
+ const track=(summary,side)=>{
+  if(!summary||!scale)return '';
+  const start=comparisonVisualPosition(summary.start,scale),end=comparisonVisualPosition(summary.end,scale);
+  if(start===null||end===null)return '';
+  const markers=side==='current'?
+   `<circle class="track-start" cx="${start}" cy="14" r="5"/><circle class="track-end" cx="${end}" cy="14" r="2.5"/>`:
+   `<rect class="track-start" x="${start-5}" y="9" width="10" height="10"/><rect class="track-end" x="${end-2.5}" y="11.5" width="5" height="5"/>`;
+  return `<svg class="comparison-value-track ${side}" viewBox="0 0 300 28" aria-hidden="true" focusable="false"><line class="track-guide" x1="14" y1="14" x2="286" y2="14"/><line class="track-connector" x1="${start}" y1="14" x2="${end}" y2="14"/>${markers}</svg>`;
+ };
+ return {current:track(row.current,'current'),archived:track(row.archived,'archive')};
+}
+function comparisonSideHTML(row,title,side,visual=''){
  if(!row)return `<div class="period-side period-side-${side}"><h4>${title}</h4><p>Keine Trendberechnung möglich</p></div>`;
  const rounded=Number(row.delta.toFixed(row.digits));
  const sign=rounded>0?'+':rounded<0?'−':'±';
  const unit=row.unit?` ${row.unit}`:'';
- return `<div class="period-side period-side-${side}"><h4>${title}</h4>
+ return `<div class="period-side period-side-${side}"><h4>${title}</h4>${visual}
   <p>${fmt(row.start,row.digits)} → ${fmt(row.end,row.digits)}${unit} · Δ ${sign}${fmt(Math.abs(rounded),row.digits)}${unit}</p>
   <p class="summary-basis">${row.count} ${row.count===1?'Wert':'Werte'} · ${row.weeks} ${row.weeks===1?'Woche':'Wochen'}</p></div>`;
 }
@@ -1231,13 +1276,15 @@ function historicalComparisonContent(idx){
  try{comparison=experimentPeriodComparison(S,entry)}catch(e){comparison=null}
  if(!comparison)return '<p>Dieser frühere Durchgang kann mit der aktuellen App-Version nicht ausgewertet werden.</p>';
  const label=archiveComparisonLabel(entry,idx);
- const rows=comparison.rows.map(({id,current,archived})=>{
+ const rows=comparison.rows.map(row=>{
+  const {id,current,archived}=row,visual=historicalComparisonVisualHTML(row);
   const metric=SUMMARY_METRICS.find(([,metricId])=>metricId===id);
   return `<li class="period-compare-row" data-compare="${id}"><h3>${metric[0]}</h3>
-   <div class="period-compare-sides">${comparisonSideHTML(current,'Aktueller Durchgang','current')}
-   ${comparisonSideHTML(archived,'Früherer Durchgang','archive')}</div></li>`;
+   <div class="period-compare-sides">${comparisonSideHTML(current,'Aktueller Durchgang','current',visual.current)}
+   ${comparisonSideHTML(archived,'Früherer Durchgang','archive',visual.archived)}</div></li>`;
  }).join('');
  return `<p class="sub">${esc(label)} · archiviert am ${fd(entry.archivedAt)}</p>
+  ${rows?'<p class="sub">Die Positionen zeigen modellierten Anfang und modelliertes Ende auf einer parameterspezifischen Werteskala. Die Strecke ist keine Zeitachse.</p>':''}
   ${rows?`<ul class="period-compare-list">${rows}</ul>`:'<p>Für diesen Vergleich liegen noch nicht genügend Wochen mit Daten vor.</p>'}
   <p class="sub">Beide Seiten verwenden denselben linearen Trend; Anfang und Ende sind modelliert, keine ersten oder letzten Einzelmessungen. Die Zeiträume können unterschiedlich lang sein. Der Vergleich beschreibt Daten, ohne statistische Signifikanz oder Ursachen zu belegen.</p>
   <p class="sub">Frühere Durchgänge werden bis zu ihrer Archivierung ausgewertet, höchstens jedoch bis zum Ende des Durchgangs. Für die Länge gelten dieselben Regeln wie im laufenden Durchgang.</p>`;
