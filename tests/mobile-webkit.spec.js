@@ -245,7 +245,7 @@ test.describe('iPhone-sized WebKit smoke checks', () => {
     expect(await page.evaluate(() => document.documentElement.scrollWidth - document.documentElement.clientWidth)).toBeLessThanOrEqual(2);
     await expect(page.locator('#v-trend .chart').first()).toBeVisible();
     const order = await page.locator('#v-trend > *').evaluateAll(nodes => nodes.map(node => node.id||node.querySelector('h2')?.textContent));
-    expect(order.slice(0,3)).toEqual(['experimentOverview','experimentSummary','dataBasis']);
+    expect(order.slice(0,4)).toEqual(['experimentOverview','experimentSummary','historicalComparison','dataBasis']);
     await expect(page.locator('#cmpA')).toBeVisible();
     await expect(page.locator('#cmpB')).toBeVisible();
     await page.locator('#cmpA').selectOption('w');
@@ -277,11 +277,49 @@ test.describe('iPhone-sized WebKit smoke checks', () => {
     expect(await heading.evaluate(el => el.getBoundingClientRect().height > parseFloat(getComputedStyle(el).lineHeight))).toBe(true);
     expect(await page.evaluate(() => document.documentElement.scrollWidth - document.documentElement.clientWidth)).toBeLessThanOrEqual(2);
     const order = await page.locator('#v-trend > *').evaluateAll(nodes => nodes.map(node => node.id || node.querySelector('h2')?.textContent));
-    expect(order.slice(0,3)).toEqual(['experimentOverview','experimentSummary','dataBasis']);
+    expect(order.slice(0,4)).toEqual(['experimentOverview','experimentSummary','historicalComparison','dataBasis']);
     await expect(page.locator('#v-trend .chart').first()).toBeVisible();
     await expect(page.locator('#cmpA')).toBeVisible();
     await expect(page.locator('#cmpB')).toBeVisible();
     await page.locator('#cmpA').selectOption('w');
     await expect(page.locator('#cmpChart')).toContainText('Gewicht');
+  });
+
+  test('historical comparison stacks period sides and keeps Verlauf reachable on phone width', async ({ page }) => {
+    const start = addDays(today(), -30);
+    const days = Object.fromEntries([0, 7, 14].map((offset, i) =>
+      [addDays(start, offset), { sys: 130 - i * 2, w: 82 - i }]));
+    const archive = blankState({ settings: { ...blankState().settings, start, days: 28 }, days });
+    await gotoApp(page);
+    await seed(page, blankState({ settings: { ...blankState().settings, start, days: 35 }, days,
+      archive: [{ label: `Archiv-${'A'.repeat(160)}`, archivedAt: addDays(start, 20), data: archive }] }));
+    await page.locator('nav button[data-tab="trend"]').tap();
+    const panel = page.locator('#historicalComparison');
+    await expect(panel).toBeVisible();
+    await expect(panel.locator('#historicalArchive')).toBeVisible();
+    await expect(panel.locator('[data-compare="sys"]')).toBeVisible();
+    const width = page.viewportSize().width;
+    for (const selector of ['#historicalArchive', '#historicalComparisonContent .sub', '.period-compare-row', '.period-side']) {
+      const boxes = await panel.locator(selector).evaluateAll(nodes => nodes.map(node => {
+        const box = node.getBoundingClientRect();
+        return { left: box.left, right: box.right };
+      }));
+      expect(boxes.length, selector).toBeGreaterThan(0);
+      for (const box of boxes) {
+        expect(box.left, selector).toBeGreaterThanOrEqual(-1);
+        expect(box.right, selector).toBeLessThanOrEqual(width + 1);
+      }
+    }
+    const context = panel.locator('#historicalComparisonContent .sub').first();
+    expect(await context.evaluate(el => el.scrollWidth - el.clientWidth)).toBeLessThanOrEqual(2);
+    const sides = await panel.locator('[data-compare="sys"] .period-side').evaluateAll(nodes =>
+      nodes.map(node => ({ y: node.getBoundingClientRect().y, bottom: node.getBoundingClientRect().bottom })));
+    expect(sides[1].y).toBeGreaterThanOrEqual(sides[0].bottom - 1);
+    expect(await page.evaluate(() => document.documentElement.scrollWidth - document.documentElement.clientWidth)).toBeLessThanOrEqual(2);
+    const order = await page.locator('#v-trend > *').evaluateAll(nodes => nodes.map(node => node.id || node.querySelector('h2')?.textContent));
+    expect(order.slice(0,4)).toEqual(['experimentOverview','experimentSummary','historicalComparison','dataBasis']);
+    await expect(page.locator('#v-trend .chart').first()).toBeVisible();
+    await expect(page.locator('#cmpA')).toBeVisible();
+    await expect(page.locator('#cmpB')).toBeVisible();
   });
 });

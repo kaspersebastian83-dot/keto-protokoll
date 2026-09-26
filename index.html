@@ -117,6 +117,18 @@ td.num,th.num{text-align:right}
 .summary-row h3{font-size:.95rem;font-weight:500;margin:0 0 2px}
 .summary-value,.summary-basis{display:block}
 .summary-basis{color:var(--muted);font-size:.85rem}
+.period-compare-list{list-style:none;padding:0;margin:12px 0}
+.period-compare-row{padding:12px 0;border-bottom:1px dashed var(--line);min-width:0;overflow-wrap:anywhere}
+.period-compare-row h3{font-size:.95rem;font-weight:500;margin:0 0 6px}
+.period-compare-sides{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px}
+.period-side{min-width:0;border:1px solid var(--line);border-radius:4px;padding:10px;overflow-wrap:anywhere}
+.period-side h4{font-size:.85rem;font-weight:500;color:var(--muted);margin:0 0 4px}
+.period-side p{margin:0}
+.period-side .summary-basis{margin-top:2px}
+.historical-comparison label{display:block;font-weight:500;margin:10px 0 4px}
+.historical-comparison select{min-height:44px;max-width:100%}
+.historical-comparison .sub{overflow-wrap:anywhere}
+@media(max-width:450px){.period-compare-sides{grid-template-columns:minmax(0,1fr)}}
 .quality-list{list-style:none;padding:0;margin:4px 0 14px}
 .quality-row{padding:10px 0;border-bottom:1px dashed var(--line);min-width:0}
 .quality-row strong{display:block;font-weight:500}
@@ -263,7 +275,7 @@ td.num,th.num{text-align:right}
 <script>
 const KEY='ketoProtokoll_v1';
 const RECOVERY_KEY='ketoProtokoll_recovery_v1';
-const VERSION='1.7.1'; // keep in sync with package.json, package-lock.json, and sw.js
+const VERSION='1.7.2'; // keep in sync with package.json, package-lock.json, and sw.js
 const SYMS=['Kopfschmerz','Müdigkeit','Muskelkrämpfe','Verdauung','Schwindel','Schlecht geschlafen','Heißhunger','Herzklopfen','Gereizt'];
 const DEFAULT_LABS=[['HbA1c','%'],['Glukose nüchtern','mg/dl'],['Gesamtcholesterin','mg/dl'],['LDL-Cholesterin','mg/dl'],['HDL-Cholesterin','mg/dl'],['Triglyzeride','mg/dl'],['Harnsäure','mg/dl'],['Kreatinin','mg/dl'],['eGFR','ml/min'],['GPT (ALT)','U/l'],['GOT (AST)','U/l'],['Gamma-GT','U/l'],['Natrium','mmol/l'],['Kalium','mmol/l'],['Magnesium','mmol/l'],['TSH','mU/l'],['CRP','mg/l']];
 const REFERENCES=[
@@ -1155,17 +1167,86 @@ function experimentSummaryHTML(summary){
    <p class="sub">Auch eine laufende Woche kann berücksichtigt werden, sobald Werte vorliegen; der Trend kann sich dadurch noch verändern.</p>`;
  return `<section class="panel experiment-summary" id="experimentSummary" aria-labelledby="experimentSummaryHeading"><h2 id="experimentSummaryHeading">Zusammenfassung des bisherigen Verlaufs</h2>${content}</section>`;
 }
+function archiveSnapshotForComparison(entry){
+ if(!plainObject(entry)||!plainObject(entry.data)||!validISODate(entry.archivedAt))return null;
+ const data=entry.data,settings=data.settings,duration=settings?.days;
+ const days=typeof duration==='number'||typeof duration==='string'&&duration.trim()?Number(duration):NaN;
+ if(!plainObject(settings)||!validISODate(settings.start)||!Number.isSafeInteger(days)||days<=0||
+    !plainObject(data.days)||!plainObject(data.weeks)||
+    Object.values(data.days).some(day=>!plainObject(day))||
+    Object.values(data.weeks).some(week=>!plainObject(week))||
+    (data.dataVersion!==undefined&&(!Number.isInteger(data.dataVersion)||data.dataVersion<0||data.dataVersion>DATA_VERSION)))return null;
+ return data;
+}
+function experimentPeriodComparison(currentState,entry,asOf=today()){
+ const archived=archiveSnapshotForComparison(entry);
+ if(!archived)return null;
+ const currentSummary=experimentSummary(currentState,asOf);
+ const effectiveLength=Math.max(7,Number(archived.settings.days));
+ const effectiveEnd=addDays(archived.settings.start,effectiveLength-1);
+ if(!validISODate(effectiveEnd))return null;
+ const archivedAsOf=entry.archivedAt<effectiveEnd?entry.archivedAt:effectiveEnd;
+ const archivedSummary=experimentSummary(archived,archivedAsOf);
+ const currentRows=new Map(currentSummary.rows.map(row=>[row.id,row]));
+ const archivedRows=new Map(archivedSummary.rows.map(row=>[row.id,row]));
+ return {archivedAsOf,rows:SUMMARY_METRICS.map(([,id])=>({id,current:currentRows.get(id)||null,
+  archived:archivedRows.get(id)||null})).filter(row=>row.current||row.archived)};
+}
+function comparisonSideHTML(row,title,side){
+ if(!row)return `<div class="period-side period-side-${side}"><h4>${title}</h4><p>Keine Trendberechnung möglich</p></div>`;
+ const rounded=Number(row.delta.toFixed(row.digits));
+ const sign=rounded>0?'+':rounded<0?'−':'±';
+ const unit=row.unit?` ${row.unit}`:'';
+ return `<div class="period-side period-side-${side}"><h4>${title}</h4>
+  <p>${fmt(row.start,row.digits)} → ${fmt(row.end,row.digits)}${unit} · Δ ${sign}${fmt(Math.abs(rounded),row.digits)}${unit}</p>
+  <p class="summary-basis">${row.count} ${row.count===1?'Wert':'Werte'} · ${row.weeks} ${row.weeks===1?'Woche':'Wochen'}</p></div>`;
+}
+function archiveComparisonLabel(entry,idx){
+ if(typeof entry?.label==='string'&&entry.label.trim())return entry.label;
+ const start=entry?.data?.settings?.start;
+ return typeof start==='string'&&validISODate(start)?`Durchgang ab ${fd(start)}`:`Früherer Durchgang ${idx+1}`;
+}
+let selectedArchiveIndex=null; // UI selection only; never stored in S.
+function historicalComparisonContent(idx){
+ const entry=S.archive[idx];
+ let comparison;
+ try{comparison=experimentPeriodComparison(S,entry)}catch(e){comparison=null}
+ if(!comparison)return '<p>Dieser frühere Durchgang kann mit der aktuellen App-Version nicht ausgewertet werden.</p>';
+ const label=archiveComparisonLabel(entry,idx);
+ const rows=comparison.rows.map(({id,current,archived})=>{
+  const metric=SUMMARY_METRICS.find(([,metricId])=>metricId===id);
+  return `<li class="period-compare-row" data-compare="${id}"><h3>${metric[0]}</h3>
+   <div class="period-compare-sides">${comparisonSideHTML(current,'Aktueller Durchgang','current')}
+   ${comparisonSideHTML(archived,'Früherer Durchgang','archive')}</div></li>`;
+ }).join('');
+ return `<p class="sub">${esc(label)} · archiviert am ${fd(entry.archivedAt)}</p>
+  ${rows?`<ul class="period-compare-list">${rows}</ul>`:'<p>Für diesen Vergleich liegen noch nicht genügend Wochen mit Daten vor.</p>'}
+  <p class="sub">Beide Seiten verwenden denselben linearen Trend; Anfang und Ende sind modelliert, keine ersten oder letzten Einzelmessungen. Die Zeiträume können unterschiedlich lang sein. Der Vergleich beschreibt Daten, ohne statistische Signifikanz oder Ursachen zu belegen.</p>
+  <p class="sub">Frühere Durchgänge werden bis zu ihrer Archivierung ausgewertet, höchstens jedoch bis zum Ende des Durchgangs. Für die Länge gelten dieselben Regeln wie im laufenden Durchgang.</p>`;
+}
+function historicalComparisonHTML(){
+ const archives=Array.isArray(S.archive)?S.archive:[];
+ if(!archives.length){selectedArchiveIndex=null;return `<section class="panel historical-comparison" id="historicalComparison" aria-labelledby="historicalComparisonHeading"><h2 id="historicalComparisonHeading">Mit früherem Durchgang vergleichen</h2><p>Ein Vergleich wird verfügbar, sobald ein früherer Durchgang archiviert wurde.</p></section>`}
+ if(!Number.isInteger(selectedArchiveIndex)||selectedArchiveIndex<0||selectedArchiveIndex>=archives.length)selectedArchiveIndex=archives.length-1;
+ const options=[...archives.keys()].reverse().map(idx=>`<option value="${idx}"${idx===selectedArchiveIndex?' selected':''}>${esc(archiveComparisonLabel(archives[idx],idx))}</option>`).join('');
+ return `<section class="panel historical-comparison" id="historicalComparison" aria-labelledby="historicalComparisonHeading"><h2 id="historicalComparisonHeading">Mit früherem Durchgang vergleichen</h2>
+  <label for="historicalArchive">Früherer Durchgang</label><select id="historicalArchive">${options}</select>
+  <div id="historicalComparisonContent">${historicalComparisonContent(selectedArchiveIndex)}</div></section>`;
+}
 function renderTrend(){
  const asOf=today();
  const overview=experimentOverview(S,asOf);
- $('#v-trend').innerHTML=`${experimentOverviewHTML(overview,asOf)}${experimentSummaryHTML(experimentSummary(S,asOf))}${experimentDataBasisHTML(overview)}<div class="panel">${chartSet().join('')}</div>
+ $('#v-trend').innerHTML=`${experimentOverviewHTML(overview,asOf)}${experimentSummaryHTML(experimentSummary(S,asOf))}${historicalComparisonHTML()}${experimentDataBasisHTML(overview)}<div class="panel">${chartSet().join('')}</div>
  <div class="panel"><h2>Vergleich zweier Werte</h2>
  <div class="row"><label for="cmpA"><b>Wert A</b></label><select id="cmpA">${METRICS.map(m=>`<option value="${m.id}"${m.id==='c'?' selected':''}>${m.label}</option>`).join('')}</select></div>
  <div class="row"><label for="cmpB"><b>Wert B</b></label><select id="cmpB">${METRICS.map(m=>`<option value="${m.id}"${m.id==='k'?' selected':''}>${m.label}</option>`).join('')}</select></div>
  <div id="cmpChart">${compareChartHTML('c','k')}</div></div>`;
 }
 $('#v-trend').addEventListener('change',e=>{
- if(e.target.id==='cmpA'||e.target.id==='cmpB')$('#cmpChart').innerHTML=compareChartHTML($('#cmpA').value,$('#cmpB').value);
+ if(e.target.id==='historicalArchive'){
+  selectedArchiveIndex=Number(e.target.value);
+  $('#historicalComparisonContent').innerHTML=historicalComparisonContent(selectedArchiveIndex);
+ }else if(e.target.id==='cmpA'||e.target.id==='cmpB')$('#cmpChart').innerHTML=compareChartHTML($('#cmpA').value,$('#cmpB').value);
 });
 
 /* ---------- print ---------- */
