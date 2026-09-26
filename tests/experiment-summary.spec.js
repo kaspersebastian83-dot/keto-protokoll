@@ -193,6 +193,6 @@ test.describe('Experiment summary in Verlauf', () => {
   test('release version and unchanged schema and keys are exposed', async ({ page }) => {
     await gotoApp(page);
     expect(await page.evaluate(() => ({ version: VERSION, schema: DATA_VERSION, key: KEY, recovery: RECOVERY_KEY })))
-      .toEqual({ version: '1.7.3', schema: 6, key: 'ketoProtokoll_v1', recovery: 'ketoProtokoll_recovery_v1' });
+      .toEqual({ version: '1.7.4', schema: 6, key: 'ketoProtokoll_v1', recovery: 'ketoProtokoll_recovery_v1' });
   });
 });

@@ -144,6 +144,7 @@ test.describe('Print output', () => {
     await seed(page, state);
 
     const html = await page.evaluate(() => reportHTML());
+    expect(html).not.toContain('comparison-value-track');
     for (const heading of ['Verlauf im Überblick', 'Umsetzung', 'Kurven', 'Laborwerte', 'Medikation', 'Beschwerden', 'Notizen', 'Beobachtungen für das Gespräch', 'Fragen für die Besprechung', 'Quellen']) {
       expect(html).toContain(`<h2>${heading}</h2>`);
     }

@@ -45,7 +45,7 @@ test.describe('Fixed chart readability', () => {
     expect(await page.evaluate(() => ({ live: JSON.stringify(S), key: localStorage.getItem(KEY),
       recovery: localStorage.getItem(RECOVERY_KEY) }))).toEqual(before);
     expect(await page.evaluate(() => ({ version: VERSION, schema: DATA_VERSION, key: KEY, recovery: RECOVERY_KEY })))
-      .toEqual({ version: '1.7.3', schema: 6, key: 'ketoProtokoll_v1', recovery: 'ketoProtokoll_recovery_v1' });
+      .toEqual({ version: '1.7.4', schema: 6, key: 'ketoProtokoll_v1', recovery: 'ketoProtokoll_recovery_v1' });
   });
 
   test('screen presentation preserves observation and goal geometry, BP values, and non-color series distinction', async ({ page }) => {
