@@ -42,6 +42,7 @@ it silently, no PWA install prompt and no offline support in that case.
 - Laboratory tracking: baseline and follow-up values, reference ranges, and changes over time
 - Measurement schedules: configure the five objective morning measurements as daily, selected weekdays, or optional
 - Today: schedule-aware completion count; completed scheduled entries collapse accessibly, while non-due measurements remain available. Historical and future dates keep the full entry layout
+- Optional local-only Commitment Mode: progress through the existing experiment, the daily Ja/Teils/Nein answer, and a factual rolling adherence summary
 - Trends: seven longitudinal charts, linear trend fitting, an experiment overview and data-quality summary, trend readiness, and a modeled current-period summary across 14 metrics
 - Historical comparison: compare current and archived period trends descriptively, without ranking or claims of significance or causation
 - Two-variable comparison: compare two selected values over time

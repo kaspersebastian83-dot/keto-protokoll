@@ -267,7 +267,7 @@ test.describe('Historical comparison visualization', () => {
     live.archive = [archive(period(start, entries(start, 'w', [84, 82, 80])))];
     await open(page, live);
     expect(await page.evaluate(() => ({ version: VERSION, schema: DATA_VERSION, key: KEY, recovery: RECOVERY_KEY })))
-      .toEqual({ version: '1.7.4', schema: 6, key: 'ketoProtokoll_v1', recovery: 'ketoProtokoll_recovery_v1' });
+      .toEqual({ version: '1.8.0', schema: 7, key: 'ketoProtokoll_v1', recovery: 'ketoProtokoll_recovery_v1' });
     const report = await page.evaluate(() => reportHTML());
     expect(report).not.toContain('comparison-value-track');
     expect(report).not.toContain('historicalComparison');

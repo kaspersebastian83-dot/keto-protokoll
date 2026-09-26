@@ -49,7 +49,7 @@ test.describe('Backup export/import', () => {
     }));
 
     expect(migrated).toEqual({
-      dataVersion: 6, weeks: {}, labDates: { base: expect.any(String), end: '' }, meds: [],
+      dataVersion: 7, weeks: {}, labDates: { base: expect.any(String), end: '' }, meds: [],
       doseChanges: [], archive: [], refRead: {},
       carbGoalHistory: [{ date: null, value: 50 }],
       alertHistory: [{ date: null, value: blankState().settings.alerts }],

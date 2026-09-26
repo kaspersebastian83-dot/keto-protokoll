@@ -116,7 +116,7 @@ test.describe('Single migration path (Part C)', () => {
     await gotoApp(page);
     const result = await page.evaluate(() => migrate({ settings: { start: '2026-01-01' } }));
 
-    expect(result.dataVersion).toBe(6);
+    expect(result.dataVersion).toBe(7);
     expect(result.settings.meds).toEqual([]);
     expect(result.settings.lastBackup).toBeNull();
     expect(result.settings.backupWarnDismissed).toBeNull();
@@ -141,7 +141,7 @@ test.describe('Single migration path (Part C)', () => {
       labs: [{ name: 'HbA1c', unit: '%', range: null, base: '', end: '' }],
     }));
 
-    expect(result.dataVersion).toBe(6);
+    expect(result.dataVersion).toBe(7);
     expect(result.settings.name).toBe('Test Patient');
     expect(result.settings.meds).toEqual([{ id: 'medA', name: 'Testmed A', dose: '10 mg', category: 'Medikament', startedAt: null, stoppedAt: null }]);
     expect(result.days).toEqual({ '2026-01-01': { w: 80 } });
@@ -163,7 +163,7 @@ test.describe('Single migration path (Part C)', () => {
       dataVersion: S.dataVersion, meds: S.settings.meds, doseChanges: S.doseChanges,
       archive: S.archive, refRead: S.refRead, weeks: S.weeks, labsCount: S.labs.length,
     }));
-    expect(state.dataVersion).toBe(6);
+    expect(state.dataVersion).toBe(7);
     expect(state.meds).toEqual([]);
     expect(state.doseChanges).toEqual([]);
     expect(state.archive).toEqual([]);

@@ -27,7 +27,7 @@ test.describe('Period handling', () => {
       live: { name: S.settings.name, alerts: S.settings.alerts, day: S.days[today()] },
     }));
     expect(result.metadata).toEqual({ label: 'Legacy period', archivedAt: '2026-02-01' });
-    expect(result.archived.dataVersion).toBe(6);
+    expect(result.archived.dataVersion).toBe(7);
     expect(result.archived.settings.name).toBe('Archived Name');
     expect(result.archived.settings.start).toBe(start);
     expect(result.archived.settings.carbGoal).toBe(42);
@@ -94,7 +94,7 @@ test.describe('Period handling', () => {
     const result = await page.evaluate(() => ({ archive: S.archive[0], liveMeds: S.settings.meds }));
     expect(result.archive.label).toBe('Old period');
     expect(result.archive.archivedAt).toBe('2026-02-01');
-    expect(result.archive.data.dataVersion).toBe(6);
+    expect(result.archive.data.dataVersion).toBe(7);
     expect(result.archive.data.settings.meds).toEqual([{ ...legacyMed, startedAt: null, stoppedAt: null }]);
     expect(result.liveMeds).toEqual([]);
   });
@@ -343,7 +343,7 @@ test.describe('Period handling', () => {
     expect(result.entry.label).toBe('Old period');
     expect(result.entry.archivedAt).toBe('2026-02-01');
     expect(result.entry.extra).toBe('Keep me');
-    expect(result.entry.data.dataVersion).toBe(6);
+    expect(result.entry.data.dataVersion).toBe(7);
     expect(result.entry.data.settings.carbGoalHistory).toEqual([{ date: null, value: 45 }]);
     expect(result.entry.data.settings.alertHistory).toEqual([{ date: null, value: oldAlerts }]);
     expect(result.detached).toBe(true);

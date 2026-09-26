@@ -57,6 +57,17 @@ textarea{min-height:64px;resize:vertical}
 .bp-line .inp{flex:1 1 170px}
 .bp-avg{display:block;color:var(--muted);font-size:.85rem;margin-top:4px}
 .today-progress{color:var(--muted);font-size:.9rem;margin:6px 0 12px}
+.commitment-today{padding:10px 14px;margin-bottom:12px;overflow-wrap:anywhere}
+.commitment-today p{margin:3px 0;font-size:.9rem}
+.commitment-today progress{display:block;width:100%;height:8px;margin:6px 0;accent-color:var(--ink)}
+.commitment-today details{font-size:.9rem;margin-top:4px}
+.commitment-today summary{cursor:pointer;min-height:44px;display:flex;align-items:center}
+.commitment-today .btns{margin-top:6px}
+.commitment-rescue{color:var(--text);font-size:.9rem;margin:6px 0 0}
+.commitment-summary{font-size:.9rem;color:var(--muted);margin:8px 0 0}
+.commitment-toggle{display:flex;align-items:center;gap:10px;min-height:44px;cursor:pointer}
+.commitment-toggle input{width:22px;height:22px;flex:none}
+.commitment-today .btns button{min-height:44px}
 .today-measurement{border-bottom:1px dashed var(--line)}
 .today-measurement:last-child{border-bottom:0}
 .today-measurement .row{border-bottom:0}
@@ -291,7 +302,7 @@ td.num,th.num{text-align:right}
 <script>
 const KEY='ketoProtokoll_v1';
 const RECOVERY_KEY='ketoProtokoll_recovery_v1';
-const VERSION='1.7.4'; // keep in sync with package.json, package-lock.json, and sw.js
+const VERSION='1.8.0'; // keep in sync with package.json, package-lock.json, and sw.js
 const SYMS=['Kopfschmerz','Müdigkeit','Muskelkrämpfe','Verdauung','Schwindel','Schlecht geschlafen','Heißhunger','Herzklopfen','Gereizt'];
 const DEFAULT_LABS=[['HbA1c','%'],['Glukose nüchtern','mg/dl'],['Gesamtcholesterin','mg/dl'],['LDL-Cholesterin','mg/dl'],['HDL-Cholesterin','mg/dl'],['Triglyzeride','mg/dl'],['Harnsäure','mg/dl'],['Kreatinin','mg/dl'],['eGFR','ml/min'],['GPT (ALT)','U/l'],['GOT (AST)','U/l'],['Gamma-GT','U/l'],['Natrium','mmol/l'],['Kalium','mmol/l'],['Magnesium','mmol/l'],['TSH','mU/l'],['CRP','mg/l']];
 const REFERENCES=[
@@ -390,7 +401,28 @@ const vv=x=>x==null?'':String(x).replace('.',',');
 const uid=()=>'m'+Date.now().toString(36)+Math.random().toString(36).slice(2,7);
 
 let S;
-const DATA_VERSION=6;
+const DATA_VERSION=7;
+const MAX_EXPERIMENT_DAYS=3650;
+const COMMITMENT_LIMITS={statement:240,reason:160,agreedRule:240};
+const defaultCommitment=()=>({enabled:false,statement:'',reason:'',agreedRule:''});
+const durationNumber=value=>{
+ const n=Number(value);
+ return value==null||String(value).trim()===''||!Number.isFinite(n)||n<=0||n>MAX_EXPERIMENT_DAYS?null:n;
+};
+const effectiveDuration=value=>Math.max(7,Math.round(durationNumber(value)??90));
+function normalizeCommitment(value){
+ const source=plainObject(value)?value:{};
+ const result=defaultCommitment();
+ if(typeof source.enabled==='boolean')result.enabled=source.enabled;
+ for(const key of Object.keys(COMMITMENT_LIMITS))
+  if(typeof source[key]==='string')result[key]=source[key].slice(0,COMMITMENT_LIMITS[key]);
+ return result;
+}
+function validCommitment(value){
+ return plainObject(value)&&typeof value.enabled==='boolean'&&
+  Object.keys(COMMITMENT_LIMITS).every(key=>typeof value[key]==='string'&&value[key].length<=COMMITMENT_LIMITS[key])&&
+  Object.keys(value).every(key=>key==='enabled'||Object.prototype.hasOwnProperty.call(COMMITMENT_LIMITS,key));
+}
 const MEASUREMENT_IDS=['w','g','k','bp','p'];
 const MEASUREMENT_LABELS={w:'Gewicht',g:'Blutzucker',k:'Ketone',bp:'Blutdruck',p:'Puls'};
 const ISO_WEEKDAYS=[['Mo','Montag'],['Di','Dienstag'],['Mi','Mittwoch'],['Do','Donnerstag'],['Fr','Freitag'],['Sa','Samstag'],['So','Sonntag']];
@@ -422,21 +454,46 @@ function isMeasurementDue(id,date){
  return entry.mode==='daily'||entry.mode==='weekdays'&&entry.weekdays.includes(isoWeekday(date));
 }
 function dueMeasurementIds(date){return MEASUREMENT_IDS.filter(id=>isMeasurementDue(id,date))}
+function defaultSettings(){
+ const alerts={sysMin:null,sysMax:null,diaMin:null,diaMax:null,gMin:null,gMax:null,pMin:null,pMax:null,action:''};
+ return {name:'',start:today(),days:90,carbGoal:50,questions:'',lastBackup:null,meds:[],backupWarnDismissed:null,
+  alerts,carbGoalHistory:[{date:null,value:50}],alertHistory:[{date:null,value:{...alerts}}],
+  measurementSchedule:defaultMeasurementSchedule(),commitment:defaultCommitment()};
+}
+function normalizeSettings(settings){
+ const defaults=defaultSettings();
+ if(typeof settings.name!=='string')settings.name=defaults.name;
+ if(!validISODate(settings.start))settings.start=defaults.start;
+ if(durationNumber(settings.days)===null)settings.days=defaults.days;
+ if(!Number.isFinite(Number(settings.carbGoal))||Number(settings.carbGoal)<=0)settings.carbGoal=defaults.carbGoal;
+ if(typeof settings.questions!=='string')settings.questions=defaults.questions;
+ if(settings.lastBackup===undefined)settings.lastBackup=defaults.lastBackup;
+ if(!Array.isArray(settings.meds))settings.meds=defaults.meds;
+ if(settings.backupWarnDismissed===undefined)settings.backupWarnDismissed=defaults.backupWarnDismissed;
+ if(!plainObject(settings.alerts))settings.alerts=defaults.alerts;
+ else for(const key of Object.keys(defaults.alerts))if(settings.alerts[key]===undefined)settings.alerts[key]=defaults.alerts[key];
+ if(!Array.isArray(settings.carbGoalHistory))settings.carbGoalHistory=[{date:null,value:settings.carbGoal}];
+ if(!Array.isArray(settings.alertHistory))settings.alertHistory=[{date:null,value:{...settings.alerts}}];
+ if(!validMeasurementSchedule(settings.measurementSchedule)){
+  const source=plainObject(settings.measurementSchedule)?settings.measurementSchedule:{};
+  settings.measurementSchedule=Object.fromEntries(MEASUREMENT_IDS.map(id=>
+   [id,validMeasurementScheduleEntry(source[id])?source[id]:defaults.measurementSchedule[id]]));
+ }
+ settings.commitment=normalizeCommitment(settings.commitment);
+}
 // Upgrades one saved state to the current shape without traversing its archive.
 // Shared by live data, backup import, and archived snapshots.
 function migrateState(data){
  let d=(data&&typeof data==='object')?data:{};
  let v=d.dataVersion||0;
+ if(!d.settings||typeof d.settings!=='object'||Array.isArray(d.settings)){
+  d.settings={};v=0;
+ }
+ if(!d.days||typeof d.days!=='object'||Array.isArray(d.days)){
+  d.days={};v=0;
+ }
+ normalizeSettings(d.settings);
  if(v<1){
-  if(!d.settings||typeof d.settings!=='object')d.settings={};
-  if(!d.settings.name)d.settings.name='';
-  if(!d.settings.start)d.settings.start=today();
-  if(!d.settings.days)d.settings.days=90;
-  if(!d.settings.carbGoal)d.settings.carbGoal=50;
-  if(d.settings.questions==null)d.settings.questions='';
-  if(d.settings.lastBackup===undefined)d.settings.lastBackup=null;
-  if(!d.settings.meds)d.settings.meds=[];
-  if(d.settings.backupWarnDismissed===undefined)d.settings.backupWarnDismissed=null;
   if(!d.days)d.days={};
   if(!d.weeks)d.weeks={};
   if(!d.labs)d.labs=DEFAULT_LABS.map(([n,u])=>({name:n,unit:u,range:'',base:'',end:''}));
@@ -478,6 +535,9 @@ function migrateState(data){
  if(v<6){
   if(d.settings.measurementSchedule===undefined)d.settings.measurementSchedule=defaultMeasurementSchedule();
   v=6;
+ }
+ if(v<7){
+  v=7;
  }
  d.dataVersion=v;
  return d;
@@ -521,7 +581,7 @@ function save(msg){
  return saved;
 }
 function status(t){const el=$('#status');el.textContent=t;el.classList.add('show');clearTimeout(stT);stT=setTimeout(()=>el.classList.remove('show'),1400)}
-const N=()=>Math.max(7,Number(S.settings.days)||90);
+const N=()=>effectiveDuration(S.settings.days);
 const nWeeks=()=>Math.ceil(N()/7);
 const weekRange=n=>{const s=addDays(S.settings.start,(n-1)*7);return [s,addDays(s,6)]};
 const weekOf=ds=>Math.floor(diffDays(S.settings.start,ds)/7)+1;
@@ -793,6 +853,59 @@ function updateTodayProgress(d){
  progress.textContent=todayProgressText(d,due);
  const summary=$('#todayExtraSummary');if(summary)summary.innerHTML=extraSummaryText(d,extra);
 }
+function commitmentMilestones(length){
+ const candidates=[[7,'Erste Woche'],[Math.round(length*.25),'Ein Viertel'],
+  [Math.round(length*.5),'Halbzeit'],[Math.round(length*.75),'Drei Viertel'],[length,'Abschluss']];
+ const byDay=new Map();
+ candidates.forEach(([day,label])=>byDay.set(Math.max(1,Math.min(length,day)),label));
+ return [...byDay].sort((a,b)=>a[0]-b[0]).map(([day,label])=>({day,label}));
+}
+function commitmentProgress(state,asOf=today()){
+ const length=effectiveDuration(state.settings.days);
+ const range=experimentRange(state.settings.start,length,asOf);
+ const day=diffDays(range.start,asOf)+1;
+ const milestones=commitmentMilestones(length);
+ return {range,day,shownDay:Math.max(0,Math.min(length,day)),
+  current:milestones.find(m=>m.day===day)||null,
+  next:milestones.find(m=>m.day>Math.max(0,day))||null};
+}
+function commitmentAdherence(state,asOf=today()){
+ const {range}=commitmentProgress(state,asOf);
+ if(asOf<range.start)return null;
+ const end=asOf<range.end?asOf:range.end;
+ const start=addDays(end,-27)>range.start?addDays(end,-27):range.start;
+ const counts={y:0,t:0,n:0,missing:0};
+ for(let i=0;i<=diffDays(start,end);i++){
+  const plan=state.days[addDays(start,i)]?.plan;
+  if(plan==='y'||plan==='t'||plan==='n')counts[plan]++;
+  else counts.missing++;
+ }
+ return {start,end,length:diffDays(start,end)+1,...counts};
+}
+function commitmentTodayHTML(){
+ const config=S.settings.commitment;
+ if(!config?.enabled)return '';
+ const {range,day,shownDay,current,next}=commitmentProgress(S);
+ const dateFormat={day:'numeric',month:'long',year:'numeric'};
+ const progress=day<1?`Geplanter Start: ${fd(range.start,dateFormat)}`:
+  day>range.length?'Der geplante Zeitraum ist abgeschlossen.':
+  day===range.length?`Tag ${range.length} von ${range.length} · letzter geplanter Tag`:
+  `Tag ${day} von ${range.length} · noch ${range.length-day} Tage`;
+ return `<section class="panel commitment-today" id="commitmentToday" aria-label="90-Tage-Commitment">
+  <p><b>${progress}</b> · Ende: ${fd(range.end,dateFormat)}</p>
+  <progress id="commitmentBar" max="${range.length}" value="${shownDay}" aria-label="Experimentfortschritt: ${shownDay} von ${range.length} Tagen"></progress>
+  ${config.reason?`<p>${esc(config.reason)}</p>`:''}
+  ${current?`<p>Meilenstein erreicht: ${current.label} (Tag ${current.day})</p>`:''}
+  ${next?`<p>Nächster Meilenstein: ${next.label} (Tag ${next.day})</p>`:''}
+  ${config.agreedRule?`<details><summary>Mit meinem Arzt vereinbart</summary><p>${esc(config.agreedRule)}</p></details>`:''}
+  ${day>range.length?'<div class="btns"><button type="button" class="btn" data-commit-goto="trend">Verlauf ansehen</button><button type="button" class="btn" data-commit-goto="print">Bericht öffnen</button></div>':''}
+ </section>`;
+}
+function commitmentSummaryHTML(){
+ if(!S.settings.commitment.enabled||curDate!==today())return '';
+ const summary=commitmentAdherence(S);
+ return summary?`<p class="commitment-summary" id="commitmentSummary">Letzte ${summary.length} Tage: ${summary.y} Ja · ${summary.t} Teils · ${summary.n} Nein · ${summary.missing} nicht eingetragen</p>`:'';
+}
 const invalidMeasurementDrafts=new WeakSet();
 function measurementHasInvalidDraft(block){
  return [...block.querySelectorAll('input[data-f]')].some(input=>invalidMeasurementDrafts.has(input));
@@ -811,7 +924,7 @@ function renderDay(){
  const showBackupWarn=backupUrgency()==='critical'&&S.settings.backupWarnDismissed!==today();
  const alertHits=checkAlerts(d,curDate);
  let h=`${alertHits.length?alertPanelHTML(alertHits,curDate):''}${showBackupWarn?backupWarnHTML():''}<div class="datebar"><button type="button" class="btn" data-nav="-1" aria-label="Vorheriger Tag">‹</button><input type="date" id="dpick" value="${curDate}" aria-label="Datum"><button type="button" class="btn" data-nav="1" aria-label="Nächster Tag">›</button>${curDate!==today()?'<button type="button" class="btn" data-nav="0">Heute</button>':''}</div>
- <p class="sub" style="margin-bottom:12px">${fd(curDate,{weekday:'long',day:'numeric',month:'long'})}${inR?`, Tag ${i+1}`:', außerhalb des Zeitraums'}</p>`;
+ <p class="sub" style="margin-bottom:12px">${fd(curDate,{weekday:'long',day:'numeric',month:'long'})}${inR?`, Tag ${i+1}`:', außerhalb des Zeitraums'}</p>${curDate===today()?commitmentTodayHTML():''}`;
  if(quick){
   const due=dueMeasurementIds(curDate),extra=MEASUREMENT_IDS.filter(id=>!due.includes(id));
   h+=`<div class="panel" id="todayDue"><h2>Heute vorgesehen</h2><p class="today-progress" id="todayProgress" aria-live="polite" aria-atomic="true">${todayProgressText(d,due)}</p>
@@ -825,7 +938,9 @@ function renderDay(){
  ${numRow('c','Kohlenhydrate',`grob geschätzt, Limit ${carbGoalOnDate(curDate)} g`,'g',d,'numeric',plausMsg('c',d))}
  ${scaleRow('en','Energie','1 schlapp, 5 topfit',d)}
  ${scaleRow('hu','Hunger','1 kaum, 5 stark',d)}
- <div class="row"><div class="lbl"><b>Im Plan geblieben?</b></div><div class="seg" role="group" aria-label="Im Plan geblieben">${[['y','Ja'],['t','Teils'],['n','Nein']].map(([k,l])=>`<button type="button" data-plan="${k}" class="${d.plan===k?'on':''}" aria-pressed="${d.plan===k}">${l}</button>`).join('')}</div></div>
+ <div class="row"><div class="lbl"><b>Im Plan geblieben?</b>${S.settings.commitment.enabled?'<small>Deine Selbsteinschätzung zum Experiment</small>':''}</div><div class="seg" role="group" aria-label="Im Plan geblieben">${[['y','Ja'],['t','Teils'],['n','Nein']].map(([k,l])=>`<button type="button" data-plan="${k}" class="${d.plan===k?'on':''}" aria-pressed="${d.plan===k}">${l}</button>`).join('')}</div></div>
+ ${S.settings.commitment.enabled&&curDate===today()&&d.plan==='n'?'<p class="commitment-rescue" id="commitmentRescue">Ein schwieriger Tag beendet den Versuch nicht. Die nächste geplante Mahlzeit gehört wieder zum Experiment.</p>':''}
+ ${commitmentSummaryHTML()}
  <div class="row wide"><div class="lbl"><b>Beschwerden</b><small>antippen, was heute auffiel</small></div><div class="chips">${SYMS.map(s=>{const on=(d.sym||[]).includes(s);return `<button type="button" data-sym="${esc(s)}" class="${on?'on':''}" aria-pressed="${on}">${s}</button>`}).join('')}</div></div>
  <div class="row wide"><label for="f_note"><b>Notiz</b><small>optional</small></label><textarea id="f_note" data-t="note">${esc(d.note)}</textarea></div>
  </div>
@@ -878,6 +993,7 @@ $('#v-day').addEventListener('click',e=>{
  if(b.id==='backupWarnDismiss'){S.settings.backupWarnDismissed=today();save();renderDay();return}
  if(b.dataset.nav!=null){const n=+b.dataset.nav;curDate=n===0?today():addDays(curDate,n);renderDay();renderHead();return}
  if(b.dataset.openWeek!=null){curWeek=+b.dataset.openWeek;show('week');return}
+ if(b.dataset.commitGoto){show(b.dataset.commitGoto);return}
  const d=getDay(curDate);
  if(b.dataset.scale){const f=b.dataset.scale,v=+b.dataset.v;if(d[f]===v)delete d[f];else d[f]=v}
  else if(b.dataset.plan){d.plan=d.plan===b.dataset.plan?undefined:b.dataset.plan;if(!d.plan)delete d.plan}
@@ -1110,7 +1226,7 @@ function overviewMetric(id,source,days,weeks,range){
   bpComplete:id==='bp'?matching.filter(e=>measurementComplete('bp',e.day)).length:null};
 }
 function experimentOverview(state,asOf=today()){
- const range=experimentRange(state.settings.start,Math.max(7,Number(state.settings.days)||90),asOf);
+ const range=experimentRange(state.settings.start,effectiveDuration(state.settings.days),asOf);
  const days=overviewDays(state.days,range),due=overviewDueWeeks(range);
  const loggedDays=days.filter(e=>e.day&&typeof e.day==='object'&&Object.keys(e.day).length>0).length;
  const completedWeeks=due.filter(n=>WF.every(([field])=>state.weeks[n]?.[field]!=null)).length;
@@ -1162,7 +1278,7 @@ function trendSummaryFromPairs(pairs){
  return {start,end,delta:end-start};
 }
 function experimentSummary(state,asOf=today()){
- const range=experimentRange(state.settings.start,Math.max(7,Number(state.settings.days)||90),asOf);
+ const range=experimentRange(state.settings.start,effectiveDuration(state.settings.days),asOf);
  if(!range.elapsed)return {started:false,rows:[]};
  const days=overviewDays(state.days,range);
  const rows=SUMMARY_METRICS.flatMap(([label,id,unit,digits,source])=>{
@@ -1195,7 +1311,7 @@ function archiveSnapshotForComparison(entry){
  if(!plainObject(entry)||!plainObject(entry.data)||!validISODate(entry.archivedAt))return null;
  const data=entry.data,settings=data.settings,duration=settings?.days;
  const days=typeof duration==='number'||typeof duration==='string'&&duration.trim()?Number(duration):NaN;
- if(!plainObject(settings)||!validISODate(settings.start)||!Number.isSafeInteger(days)||days<=0||
+ if(!plainObject(settings)||!validISODate(settings.start)||!Number.isSafeInteger(days)||days<=0||days>MAX_EXPERIMENT_DAYS||
     !plainObject(data.days)||!plainObject(data.weeks)||
     Object.values(data.days).some(day=>!plainObject(day))||
     Object.values(data.weeks).some(week=>!plainObject(week))||
@@ -1206,7 +1322,7 @@ function experimentPeriodComparison(currentState,entry,asOf=today()){
  const archived=archiveSnapshotForComparison(entry);
  if(!archived)return null;
  const currentSummary=experimentSummary(currentState,asOf);
- const effectiveLength=Math.max(7,Number(archived.settings.days));
+ const effectiveLength=effectiveDuration(archived.settings.days);
  const effectiveEnd=addDays(archived.settings.start,effectiveLength-1);
  if(!validISODate(effectiveEnd))return null;
  const archivedAsOf=entry.archivedAt<effectiveEnd?entry.archivedAt:effectiveEnd;
@@ -1501,7 +1617,7 @@ function reportHTML(){
  ${DR.map(([l,f,u,d])=>trendRow(l,u,d,weeklyPairsDay(f))).join('')}${WR.map(([l,f,u,d])=>trendRow(l,u,d,weeklyPairsWeek(f))).join('')}</tbody></table>
  <p class="small">Anfang und Ende basieren auf dem linearen Trend über alle Wochen mit Daten, nicht auf einzelnen Wochenwerten, damit einzelne ungewöhnliche Wochen das Ergebnis nicht verzerren.</p>
  <h2>Umsetzung</h2>
- <p>Im Plan geblieben: ${pl.length?`${py} Tage voll, ${pt} teilweise, ${pl.length-py-pt} nicht (von ${pl.length} Tagen mit Angabe)`:'keine Angaben'}.</p>
+ <p>Im Plan geblieben (Selbsteinschätzung): ${pl.length?`${py} Tage voll, ${pt} teilweise, ${pl.length-py-pt} nicht (von ${pl.length} Tagen mit Angabe)`:'keine Angaben'}.</p>
  <p>Ketonmessungen: ${kd.length?`${kin} von ${kd.length} bei 0,5 mmol/l oder höher, Mittelwert ${fmt(kd.reduce((s,d)=>s+d.k,0)/kd.length,2)} mmol/l`:'keine'}.</p>
  <p>Kohlenhydrate: ${cd.length?`Ø ${fmt(cd.reduce((s,[,d])=>s+d.c,0)/cd.length,0)} g/Tag, an ${cOver} von ${cd.length} Tagen über dem jeweils gültigen Limit`:'keine Angaben'}.</p>
  ${goalHistory.length>1?`<p class="small">Kohlenhydrat-Limit: ${goalHistory.map(e=>`${e.date?`ab ${fd(e.date,{day:'2-digit',month:'2-digit',year:'numeric'})}`:'Beginn des Zeitraums'}: ${fmt(e.value,0)} g/Tag`).join(' · ')}</p>`:''}
@@ -1573,6 +1689,11 @@ function renderSet(){
  <div class="row"><label for="s_days"><b>Dauer</b><small>in Tagen</small></label><div class="inp" style="flex-wrap:wrap"><input id="s_days" data-s="days" inputmode="numeric" value="${st.days}" style="flex:1 1 60px"><span class="unit">Tage</span><button type="button" class="btn" data-extend="28" style="padding:5px 8px;font-size:.78rem;white-space:nowrap">+4 Wochen</button><button type="button" class="btn" data-extend="84" style="padding:5px 8px;font-size:.78rem;white-space:nowrap">+12 Wochen</button></div></div>
  <div class="row"><label for="s_carb"><b>Kohlenhydrat-Limit</b><small>wie mit dem Arzt abgesprochen</small></label><div class="inp"><input id="s_carb" data-s="carbGoal" inputmode="numeric" value="${st.carbGoal}"><span class="unit">g/Tag</span></div></div>
  <div class="row"><label for="s_carb_date"><b>Limit gilt ab</b></label><input id="s_carb_date" type="date" value="${today()}" min="${st.start}" max="${today()}"></div></div>
+ <div class="panel" id="commitmentSettings"><h2>90-Tage-Commitment</h2><p class="sub">Optionaler Begleiter für deinen geplanten Zeitraum. Deine Angaben bleiben auf diesem Gerät und in deinen Backups.</p>
+ <label class="commitment-toggle" for="s_commit_enabled"><input id="s_commit_enabled" type="checkbox" data-commit="enabled" ${st.commitment.enabled?'checked':''}>Commitment Mode aktivieren</label>
+ <div class="row wide"><label for="s_commit_statement"><b>Mein Commitment</b><small>optional · bis 240 Zeichen · bleibt in den Einstellungen</small></label><textarea id="s_commit_statement" data-commit="statement" maxlength="240" rows="3">${esc(st.commitment.statement)}</textarea></div>
+ <div class="row wide"><label for="s_commit_reason"><b>Warum ich das mache</b><small>optional · bis 160 Zeichen · kann auf Heute erscheinen</small></label><textarea id="s_commit_reason" data-commit="reason" maxlength="160" rows="2">${esc(st.commitment.reason)}</textarea></div>
+ <div class="row wide"><label for="s_commit_rule"><b>Mit meinem Arzt vereinbart</b><small>optional · bis 240 Zeichen · nur deine eigene Formulierung, keine automatische Auswertung</small></label><textarea id="s_commit_rule" data-commit="agreedRule" maxlength="240" rows="2">${esc(st.commitment.agreedRule)}</textarea></div></div>
  <div class="panel"><h2>Messplan</h2><p class="sub">Lege fest, welche Messungen dir an welchen Tagen als vorgesehen angezeigt werden sollen. Du kannst Werte trotzdem jederzeit eintragen.</p>${scheduleRows}</div>
  <div class="panel"><h2>Neuer Durchgang</h2><p class="sub">Archiviert den aktuellen Zeitraum vollständig (Tageswerte, Wochenwerte, Labor, Dosisänderungen) und beginnt heute neu. Laufende Medikamente werden unverändert übernommen.</p>
  <div class="btns"><button type="button" class="btn primary" id="newRound">Neuen Durchgang starten</button></div></div>
@@ -1625,6 +1746,15 @@ function editableMeasurementSchedule(){
 }
 $('#v-set').addEventListener('change',e=>{
  const t=e.target,k=t.dataset.s;
+ if(t.dataset.commit){
+  const field=t.dataset.commit;
+  if(field==='enabled')S.settings.commitment.enabled=t.checked;
+  else if(Object.prototype.hasOwnProperty.call(COMMITMENT_LIMITS,field)){
+   const value=t.value.trim().slice(0,COMMITMENT_LIMITS[field]);
+   S.settings.commitment[field]=value;t.value=value;
+  }else return;
+  save();return;
+ }
  if(t.dataset.msMode!=null){
   const id=t.dataset.msMode,mode=t.value;
   if(!MEASUREMENT_IDS.includes(id)||!['daily','weekdays','optional'].includes(mode))return;
@@ -1654,7 +1784,7 @@ $('#v-set').addEventListener('change',e=>{
    const date=settingsEffectiveDate('s_carb_date');if(!date)return;
    upsertCarbGoalHistory(date,Math.round(n));syncCurrentSettings();refreshDatedSettings();return;
   }
-  if(k==='days'){const n=num(t.value);if(n==null||n<=0){status('Bitte eine Zahl eingeben');return}S.settings[k]=Math.round(n)}
+  if(k==='days'){const n=durationNumber(t.value);if(n===null||Math.round(n)<=0){status(`Bitte eine Zahl zwischen 1 und ${MAX_EXPERIMENT_DAYS} eingeben`);t.value=S.settings.days;return}S.settings[k]=Math.round(n)}
   else if(k==='start'){if(!t.value)return;S.settings.start=t.value;$('#s_carb_date').min=t.value;$('#al_date').min=t.value}
   else S.settings[k]=t.value.trim();
   save();curWeek=Math.min(nWeeks(),Math.max(1,weekOf(today())));renderHead();return
@@ -1718,7 +1848,11 @@ $('#v-set').addEventListener('click',e=>{
   if(!validISODate(date)||m.startedAt&&date<m.startedAt||m.stoppedAt&&date>=m.stoppedAt){status('Bitte ein gültiges Datum innerhalb des Einnahmezeitraums eingeben');return}
   S.doseChanges.push({date,medId:m.id,oldDose:m.dose,newDose:nv.trim()});m.dose=nv.trim();save('Dosis aktualisiert');renderSet();
  }
- else if(b.dataset.extend!=null){S.settings.days=(Number(S.settings.days)||0)+Number(b.dataset.extend);save();renderSet();renderHead()}
+ else if(b.dataset.extend!=null){
+  const next=effectiveDuration(S.settings.days)+Number(b.dataset.extend);
+  if(next>MAX_EXPERIMENT_DAYS){status(`Höchstens ${MAX_EXPERIMENT_DAYS} Tage möglich`);return}
+  S.settings.days=next;save();renderSet();renderHead();
+ }
  else if(id==='newRound'){
   const end=addDays(S.settings.start,N()-1);
   if(!confirm(`Der aktuelle Zeitraum (${fd(S.settings.start,{day:'numeric',month:'long',year:'numeric'})} bis ${fd(end,{day:'numeric',month:'long',year:'numeric'})}) wird archiviert und bleibt über 'Frühere Durchgänge' einsehbar. Ein neuer Durchgang beginnt heute. Fortfahren?`))return;
@@ -1733,6 +1867,7 @@ function startNewRound(){
  const goal=carbGoalOnDate(t),alerts={...alertsOnDate(t)};
  S.settings.meds=S.settings.meds.filter(m=>medAppliesOnDate(m,t));
  S.settings.start=t;
+ S.settings.commitment=defaultCommitment();
  S.settings.carbGoal=goal;
  S.settings.alerts=alerts;
  S.settings.carbGoalHistory=[{date:t,value:goal}];
@@ -1766,16 +1901,19 @@ const validMedication=med=>plainObject(med)&&
  (med.startedAt===null||med.stoppedAt===null||med.stoppedAt>med.startedAt);
 function validateBackupShape(data){
  if(!plainObject(data)||!plainObject(data.settings)||!plainObject(data.days))return false;
+ if('days' in data.settings&&durationNumber(data.settings.days)===null)return false;
  if('dataVersion' in data&&(!Number.isInteger(data.dataVersion)||data.dataVersion<0))return false;
  for(const key of ['weeks','labDates','refRead'])if(key in data&&!plainObject(data[key]))return false;
  for(const key of ['labs','doseChanges','archive'])if(key in data&&!Array.isArray(data[key]))return false;
  for(const key of ['alerts'])if(key in data.settings&&!plainObject(data.settings[key]))return false;
- if('measurementSchedule' in data.settings&&!plainObject(data.settings.measurementSchedule))return false;
+ if('measurementSchedule' in data.settings&&!validMeasurementSchedule(data.settings.measurementSchedule))return false;
+ if('commitment' in data.settings&&!validCommitment(data.settings.commitment))return false;
  for(const key of ['meds','carbGoalHistory','alertHistory'])if(key in data.settings&&!Array.isArray(data.settings[key]))return false;
  return true;
 }
 function validatePreparedBackup(data){
  return validateBackupShape(data)&&validISODate(data.settings.start)&&
+  validCommitment(data.settings.commitment)&&
   validMeasurementSchedule(data.settings.measurementSchedule)&&
   optionalDate(data.settings.lastBackup)&&
   ['weeks','labDates','refRead'].every(key=>plainObject(data[key]))&&
