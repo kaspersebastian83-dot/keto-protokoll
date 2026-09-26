@@ -107,6 +107,18 @@ td.num,th.num{text-align:right}
 .chart{margin:0 0 18px}
 .chart figcaption{font-weight:500;margin-bottom:2px}
 .chart svg{width:100%;height:auto;display:block}
+.overview-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px;margin-top:12px}
+.overview-stat{min-width:0;border:1px solid var(--line);border-radius:4px;padding:10px 12px;overflow-wrap:anywhere}
+.overview-stat h3{font-size:.9rem;font-weight:500;color:var(--muted);margin:0 0 4px}
+.overview-stat p{margin:0}
+.overview-stat .sub{margin-top:3px}
+.quality-list{list-style:none;padding:0;margin:4px 0 14px}
+.quality-row{padding:10px 0;border-bottom:1px dashed var(--line);min-width:0}
+.quality-row strong{display:block;font-weight:500}
+.quality-meta,.quality-status,.quality-detail{display:block;font-size:.85rem;overflow-wrap:anywhere}
+.quality-meta,.quality-detail{color:var(--muted)}
+.quality-status{color:var(--text)}
+.data-basis h3{font-size:.95rem;font-weight:500;margin:12px 0 2px}
 .gl{stroke:var(--line);stroke-width:1}
 .chart text{fill:var(--muted);font-size:11px;font-family:inherit}
 .s1,.s2,.s3{fill:none;stroke-width:2;stroke-linejoin:round}
@@ -120,6 +132,7 @@ td.num,th.num{text-align:right}
 #status.show{opacity:1}
 [hidden]{display:none!important}
 @media (max-width:540px){.row{grid-template-columns:1fr 140px}.strip{grid-template-columns:repeat(15,1fr)}header h1{font-size:1.45rem}}
+@media (max-width:540px){.overview-grid{grid-template-columns:minmax(0,1fr)}}
 @media (max-width:450px){
  #v-day .row:not(.wide),#v-week .row:not(.wide){grid-template-columns:minmax(0,1fr);gap:5px}
  #v-day .row .inp,#v-week .row .inp{width:100%;min-width:0}
@@ -245,7 +258,7 @@ td.num,th.num{text-align:right}
 <script>
 const KEY='ketoProtokoll_v1';
 const RECOVERY_KEY='ketoProtokoll_recovery_v1';
-const VERSION='1.6.3'; // keep in sync with package.json, package-lock.json, and sw.js
+const VERSION='1.7.0'; // keep in sync with package.json, package-lock.json, and sw.js
 const SYMS=['Kopfschmerz','Müdigkeit','Muskelkrämpfe','Verdauung','Schwindel','Schlecht geschlafen','Heißhunger','Herzklopfen','Gereizt'];
 const DEFAULT_LABS=[['HbA1c','%'],['Glukose nüchtern','mg/dl'],['Gesamtcholesterin','mg/dl'],['LDL-Cholesterin','mg/dl'],['HDL-Cholesterin','mg/dl'],['Triglyzeride','mg/dl'],['Harnsäure','mg/dl'],['Kreatinin','mg/dl'],['eGFR','ml/min'],['GPT (ALT)','U/l'],['GOT (AST)','U/l'],['Gamma-GT','U/l'],['Natrium','mmol/l'],['Kalium','mmol/l'],['Magnesium','mmol/l'],['TSH','mU/l'],['CRP','mg/l']];
 const REFERENCES=[
@@ -1015,8 +1028,84 @@ function compareChartHTML(idA,idB){
  if(!a||!b)return '';
  return chart2(a.label,metricPts(a),a.unit,b.label,metricPts(b),b.unit);
 }
+const OVERVIEW_DAILY=[['w','Gewicht'],['g','Blutzucker'],['k','Ketone'],['bp','Blutdruck'],['p','Puls'],['c','Kohlenhydrate'],['en','Energie'],['hu','Hunger']];
+const OVERVIEW_WEEKLY=[['waist','Bauchumfang'],['rhr','Ruhepuls'],['sleep','Schlaf'],['stress','Stress'],['steps','Schritte']];
+function experimentRange(start,length,asOf=today()){
+ const end=addDays(start,length-1),analysisEnd=asOf<end?asOf:end;
+ const elapsed=analysisEnd<start?0:diffDays(start,analysisEnd)+1;
+ return {start,end,analysisEnd,elapsed,startedWeeks:Math.ceil(elapsed/7),length};
+}
+function overviewDueWeeks(range){
+ const due=[];
+ for(let n=1;n<=Math.ceil(range.length/7);n++){
+  const normalEnd=addDays(range.start,n*7-1);
+  if((normalEnd<range.end?normalEnd:range.end)<=range.analysisEnd)due.push(n);
+ }
+ return due;
+}
+function overviewDays(days,range){
+ return Array.from({length:range.elapsed},(_,i)=>({date:addDays(range.start,i),week:Math.floor(i/7)+1,day:days[addDays(range.start,i)]||{}}));
+}
+function overviewWeeklyPairs(id,source,days,weeks,range){
+ const pairs=[];
+ for(let n=1;n<=range.startedWeeks;n++){
+  if(source==='week'){
+   const value=weeks[n]?.[id];
+   if(typeof value==='number'&&Number.isFinite(value))pairs.push([n,value]);
+  }else{
+   const values=days.filter(e=>e.week===n).map(e=>e.day[id==='bp'?'sys':id])
+    .filter(value=>typeof value==='number'&&Number.isFinite(value));
+   if(values.length)pairs.push([n,values.reduce((sum,value)=>sum+value,0)/values.length]);
+  }
+ }
+ return pairs;
+}
+function overviewMetric(id,source,days,weeks,range){
+ const matching=source==='week'?Array.from({length:range.startedWeeks},(_,i)=>({week:i+1,value:weeks[i+1]?.[id]}))
+  .filter(e=>e.value!=null):days.filter(e=>id==='bp'?measurementHasData('bp',e.day):e.day[id]!=null);
+ const count=matching.length,weeksRepresented=source==='week'?count:new Set(matching.map(e=>e.week)).size;
+ const pairs=overviewWeeklyPairs(id,source,days,weeks,range);
+ return {count,weeks:weeksRepresented,trendReady:trendFit(pairs)!==null,
+  bpComplete:id==='bp'?matching.filter(e=>measurementComplete('bp',e.day)).length:null};
+}
+function experimentOverview(state,asOf=today()){
+ const range=experimentRange(state.settings.start,Math.max(7,Number(state.settings.days)||90),asOf);
+ const days=overviewDays(state.days,range),due=overviewDueWeeks(range);
+ const loggedDays=days.filter(e=>e.day&&typeof e.day==='object'&&Object.keys(e.day).length>0).length;
+ const completedWeeks=due.filter(n=>WF.every(([field])=>state.weeks[n]?.[field]!=null)).length;
+ const labs={base:state.labs.filter(r=>r.base!=null&&String(r.base).trim()!=='').length,
+  end:state.labs.filter(r=>r.end!=null&&String(r.end).trim()!=='').length};
+ const daily=Object.fromEntries(OVERVIEW_DAILY.map(([id])=>[id,overviewMetric(id,'day',days,state.weeks,range)]));
+ const weekly=Object.fromEntries(OVERVIEW_WEEKLY.map(([id])=>[id,overviewMetric(id,'week',days,state.weeks,range)]));
+ return {range,loggedDays,dueWeeks:due.length,completedWeeks,labs,daily,weekly};
+}
+function experimentOverviewHTML(data,asOf=today()){
+ const {range,loggedDays,dueWeeks,completedWeeks,labs,daily,weekly}=data;
+ const dateFormat={day:'numeric',month:'long',year:'numeric'};
+ const status=range.elapsed===0?`Beginnt am ${fd(range.start,dateFormat)}`:
+  asOf>range.end?`Zeitraum abgeschlossen · ${range.length} Tage`:`Tag ${range.elapsed} von ${range.length}`;
+ const rows=(metrics,values)=>metrics.map(([id,label])=>{
+  const item=values[id];
+  return `<li class="quality-row" data-quality="${id}"><strong>${label}</strong>
+   <span class="quality-meta">${item.count} ${item.count===1?'Wert':'Werte'} · ${item.weeks} ${item.weeks===1?'Woche':'Wochen'} mit Daten</span>
+   <span class="quality-status">Trendberechnung ${item.trendReady?'möglich':'noch nicht möglich'}</span>
+   ${id==='bp'?`<span class="quality-detail">2 Messungen vollständig: ${item.bpComplete} von ${item.count} Blutdrucktagen</span>`:''}</li>`;
+ }).join('');
+ return `<section class="panel experiment-overview" id="experimentOverview" aria-labelledby="experimentHeading"><h2 id="experimentHeading">Aktueller Durchgang</h2>
+ <div class="overview-grid">
+  <section class="overview-stat"><h3>Zeitraum</h3><p>${status}</p><p class="sub">${fd(range.start,dateFormat)} bis ${fd(range.end,dateFormat)}</p></section>
+  <section class="overview-stat"><h3>Tage mit Einträgen</h3><p>${range.elapsed?`${loggedDays} von ${range.elapsed} vergangenen Tagen`:'Noch keine vergangenen Tage.'}</p></section>
+  <section class="overview-stat"><h3>Wochen-Check-ins</h3><p>${dueWeeks?`${completedWeeks} von ${dueWeeks} fälligen vollständig`:'Noch kein Wochen-Check-in fällig.'}</p></section>
+  <section class="overview-stat"><h3>Labor</h3><p>${labs.base} Basiswerte · ${labs.end} Abschlusswerte</p></section>
+ </div></section>
+ <section class="panel data-basis" id="dataBasis" aria-labelledby="dataBasisHeading"><h2 id="dataBasisHeading">Datenbasis für Auswertungen</h2>
+  <h3>Tägliche Werte</h3><ul class="quality-list">${rows(OVERVIEW_DAILY,daily)}</ul>
+  <h3>Wöchentliche Werte</h3><ul class="quality-list">${rows(OVERVIEW_WEEKLY,weekly)}</ul>
+  <p class="sub">Die Trendberechnung dieser App benötigt Werte aus mindestens drei Wochen.</p>
+ </section>`;
+}
 function renderTrend(){
- $('#v-trend').innerHTML=`<div class="panel">${chartSet().join('')}</div>
+ $('#v-trend').innerHTML=`${experimentOverviewHTML(experimentOverview(S))}<div class="panel">${chartSet().join('')}</div>
  <div class="panel"><h2>Vergleich zweier Werte</h2>
  <div class="row"><label for="cmpA"><b>Wert A</b></label><select id="cmpA">${METRICS.map(m=>`<option value="${m.id}"${m.id==='c'?' selected':''}>${m.label}</option>`).join('')}</select></div>
  <div class="row"><label for="cmpB"><b>Wert B</b></label><select id="cmpB">${METRICS.map(m=>`<option value="${m.id}"${m.id==='k'?' selected':''}>${m.label}</option>`).join('')}</select></div>
