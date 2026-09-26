@@ -107,6 +107,16 @@ td.num,th.num{text-align:right}
 .chart{margin:0 0 18px}
 .chart figcaption{font-weight:500;margin-bottom:2px}
 .chart svg{width:100%;height:auto;display:block}
+.fixed-charts .chart-meta{display:block;color:var(--muted);font-size:.85rem;font-weight:400;overflow-wrap:anywhere}
+.fixed-charts .chart-viewport{max-width:100%}
+.fixed-charts .bp-diastolic{stroke-dasharray:6 4}
+.fixed-charts .key-dashed{background:none!important;border-top:2px dashed var(--s2);height:0}
+.fixed-charts .chart-scroll-hint{display:none}
+@media(max-width:600px){
+ .fixed-charts .chart-viewport{overflow-x:auto;-webkit-overflow-scrolling:touch}
+ .fixed-charts .chart-viewport svg{min-width:600px}
+ .fixed-charts .chart-scroll-hint{display:block;margin:2px 0 6px}
+}
 .overview-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px;margin-top:12px}
 .overview-stat{min-width:0;border:1px solid var(--line);border-radius:4px;padding:10px 12px;overflow-wrap:anywhere}
 .overview-stat h3{font-size:.9rem;font-weight:500;color:var(--muted);margin:0 0 4px}
@@ -275,7 +285,7 @@ td.num,th.num{text-align:right}
 <script>
 const KEY='ketoProtokoll_v1';
 const RECOVERY_KEY='ketoProtokoll_recovery_v1';
-const VERSION='1.7.2'; // keep in sync with package.json, package-lock.json, and sw.js
+const VERSION='1.7.3'; // keep in sync with package.json, package-lock.json, and sw.js
 const SYMS=['Kopfschmerz','Müdigkeit','Muskelkrämpfe','Verdauung','Schwindel','Schlecht geschlafen','Heißhunger','Herzklopfen','Gereizt'];
 const DEFAULT_LABS=[['HbA1c','%'],['Glukose nüchtern','mg/dl'],['Gesamtcholesterin','mg/dl'],['LDL-Cholesterin','mg/dl'],['HDL-Cholesterin','mg/dl'],['Triglyzeride','mg/dl'],['Harnsäure','mg/dl'],['Kreatinin','mg/dl'],['eGFR','ml/min'],['GPT (ALT)','U/l'],['GOT (AST)','U/l'],['Gamma-GT','U/l'],['Natrium','mmol/l'],['Kalium','mmol/l'],['Magnesium','mmol/l'],['TSH','mU/l'],['CRP','mg/l']];
 const REFERENCES=[
@@ -957,8 +967,10 @@ const ser=f=>Object.entries(S.days).map(([ds,d])=>[diffDays(S.settings.start,ds)
 const wser=f=>Object.entries(S.weeks).map(([n,w])=>[(n-1)*7+3,w[f]]).filter(p=>p[1]!=null&&p[0]<N());
 function chart(title,series,o={}){
  const pts=series.flatMap(s=>s.pts);
- const cap=`<figcaption>${title}${o.unit?` <span class="sub">(${o.unit})</span>`:''}</figcaption>`;
- if(!pts.length&&!o.goalSteps)return `<figure class="chart">${cap}<p class="sub">Noch keine Werte.</p></figure>`;
+ const counts=o.seriesLabels?o.seriesLabels.map((label,i)=>`${label}: ${series[i].pts.length}`).join(' · '):`${pts.length} ${pts.length===1?'dargestellter Wert':'dargestellte Werte'}`;
+ const cap=`<figcaption>${o.screen?`<span class="chart-title">${title}</span>`:title}${o.unit?` <span class="sub">(${o.unit})</span>`:''}${o.screen?`<span class="chart-meta">${counts}${o.source?` · ${o.source}`:''}</span>`:''}</figcaption>`;
+ const figureClass=o.screen?'chart chart-fixed':'chart';
+ if(!pts.length&&!o.goalSteps)return `<figure class="${figureClass}">${cap}<p class="sub">${o.screen?'Noch keine Messwerte.':'Noch keine Werte.'}</p></figure>`;
  const n=N(),W=600,H=o.h||170,L=44,R=10,T=10,B=22;
  const ys=pts.map(p=>p[1]);if(o.band)ys.push(...o.band);if(o.goal!=null)ys.push(o.goal);if(o.goalSteps)ys.push(...o.goalSteps.map(p=>p[1]));
  let lo=Math.min(...ys),hi=Math.max(...ys),pad=(hi-lo)*.15;if(!pad)pad=Math.abs(hi)*.05||1;lo-=pad;hi+=pad;
@@ -978,9 +990,13 @@ function chart(title,series,o={}){
  }
  if(o.markers)o.markers.filter(mk=>mk.x>=0&&mk.x<n).forEach(mk=>{const mx=X(mk.x).toFixed(1);g+=`<line class="goal" x1="${mx}" x2="${mx}" y1="${T}" y2="${H-B}"/><text x="${mx}" y="${T+9}" transform="rotate(-90,${mx},${T+9})" text-anchor="start">${esc(mk.label)}</text>`});
  series.forEach(s=>{if(!s.pts.length)return;const sp=[...s.pts].sort((a,b)=>a[0]-b[0]);
-  g+=`<path class="${s.cls}" d="M${sp.map(p=>X(p[0]).toFixed(1)+','+Y(p[1]).toFixed(1)).join('L')}"/>`;
+  g+=`<path class="${s.cls}${s.lineClass?' '+s.lineClass:''}" d="M${sp.map(p=>X(p[0]).toFixed(1)+','+Y(p[1]).toFixed(1)).join('L')}"/>`;
   g+=sp.map(p=>`<circle class="${s.cls}d" r="2.6" cx="${X(p[0]).toFixed(1)}" cy="${Y(p[1]).toFixed(1)}"/>`).join('')});
- return `<figure class="chart">${cap}<svg viewBox="0 0 ${W} ${H}" role="img" aria-label="${title}">${g}</svg>${o.note?`<p class="sub">${o.note}</p>`:''}</figure>`;
+ const description=`${title}. Einheit ${o.unit}. ${counts}. Zeitraum ${o.period}.${o.a11yNote?` ${o.a11yNote}`:''}`;
+ const svg=o.screen?`<svg viewBox="0 0 ${W} ${H}" role="img" aria-label="${esc(description)}"><title>${esc(title)}</title><desc>${esc(description)}</desc>${g}</svg>`:
+  `<svg viewBox="0 0 ${W} ${H}" role="img" aria-label="${title}">${g}</svg>`;
+ const plot=o.screen?`<div class="chart-viewport" data-chart-label="${esc(title)}">${svg}</div><p class="sub chart-scroll-hint" aria-hidden="true">Diagramm seitlich verschieben</p>`:svg;
+ return `<figure class="${figureClass}">${cap}${plot}${o.screen&&!pts.length?'<p class="sub">Noch keine Messwerte. Der hinterlegte Zielverlauf wird angezeigt.</p>':''}${o.note?`<p class="sub">${o.note}</p>`:''}</figure>`;
 }
 function doseMarkers(){
  return S.doseChanges.filter(c=>doseChangeAppliesToMed(c,S.settings.meds.find(m=>m.id===c.medId))).map(c=>{const m=S.settings.meds.find(x=>x.id===c.medId);return {x:diffDays(S.settings.start,c.date),label:`${m.name} → ${c.newDose}`}});
@@ -1027,17 +1043,19 @@ function chart2(labelA,ptsA,unitA,labelB,ptsB,unitB){
  drawSeries(ptsB,YB,'s2');
  return `<figure class="chart">${cap}<svg viewBox="0 0 ${W} ${H}" role="img" aria-label="${labelA} / ${labelB}">${g}</svg><p class="sub" style="color:var(--ink)"><span class="key" style="background:var(--ink)"></span>${labelA} (${unitA})</p><p class="sub" style="color:var(--s2)"><span class="key" style="background:var(--s2)"></span>${labelB} (${unitB})</p></figure>`;
 }
-function chartSet(){
+function chartSet(screen=false){
  const start=S.settings.start,end=addDays(start,N()-1);
  const goalSteps=carbGoalsInRange(start,end).map(e=>[e.date&&e.date>start?diffDays(start,e.date):0,e.value]);
+ const period=screen?`${fd(start,{day:'2-digit',month:'2-digit',year:'numeric'})} bis ${fd(end,{day:'2-digit',month:'2-digit',year:'numeric'})}`:'';
+ const fixed=(title,series,options)=>chart(title,series,{...options,screen,period});
  return [
-  chart('Gewicht',[{pts:ser('w'),cls:'s1'}],{unit:'kg'}),
-  chart('Blutzucker nüchtern',[{pts:ser('g'),cls:'s1'}],{unit:'mg/dl'}),
-  chart('Ketone',[{pts:ser('k'),cls:'s3'}],{unit:'mmol/l',band:[0.5,3],note:'Grüne Fläche: 0,5–3,0 mmol/l, der übliche Bereich einer ernährungsbedingten Ketose.'}),
-  chart('Blutdruck',[{pts:ser('sys'),cls:'s1'},{pts:ser('dia'),cls:'s2'}],{unit:'mmHg',markers:doseMarkers(),note:'<span class="key" style="background:var(--ink)"></span>systolisch<span class="key" style="background:var(--s2)"></span>diastolisch. Gestrichelte senkrechte Linie: Dosisänderung.'}),
-  chart('Kohlenhydrate',[{pts:ser('c'),cls:'s2'}],{unit:'g/Tag',goalSteps,note:'Gestrichelt: das jeweils gültige Limit.'}),
-  chart('Ruhepuls (Garmin, Wochenmittel)',[{pts:wser('rhr'),cls:'s1'}],{unit:'/min'}),
-  chart('Bauchumfang',[{pts:wser('waist'),cls:'s1'}],{unit:'cm'})
+  fixed('Gewicht',[{pts:ser('w'),cls:'s1'}],{unit:'kg'}),
+  fixed('Blutzucker nüchtern',[{pts:ser('g'),cls:'s1'}],{unit:'mg/dl'}),
+  fixed('Ketone',[{pts:ser('k'),cls:'s3'}],{unit:'mmol/l',band:[0.5,3],note:'Grüne Fläche: 0,5–3,0 mmol/l, der übliche Bereich einer ernährungsbedingten Ketose.',a11yNote:'Grüne Fläche: 0,5 bis 3,0 mmol/l als Referenzbereich.'}),
+  fixed('Blutdruck',[{pts:ser('sys'),cls:'s1'},{pts:ser('dia'),cls:'s2',lineClass:screen?'bp-diastolic':''}],{unit:'mmHg',seriesLabels:['Systolisch','Diastolisch'],source:'abgeleitete Tageswerte',markers:doseMarkers(),note:screen?'<span class="key" style="background:var(--ink)"></span>systolisch (durchgezogen)<span class="key key-dashed"></span>diastolisch (gestrichelt). Gestrichelte senkrechte Linie: Dosisänderung.':'<span class="key" style="background:var(--ink)"></span>systolisch<span class="key" style="background:var(--s2)"></span>diastolisch. Gestrichelte senkrechte Linie: Dosisänderung.',a11yNote:'Systolisch durchgezogen, diastolisch gestrichelt. Senkrechte gestrichelte Linien markieren Dosisänderungen.'}),
+  fixed('Kohlenhydrate',[{pts:ser('c'),cls:'s2'}],{unit:'g/Tag',goalSteps,note:'Gestrichelt: das jeweils gültige Limit.',a11yNote:'Eine gestrichelte Stufenlinie zeigt den jeweils gültigen Zielverlauf.'}),
+  fixed('Ruhepuls (Garmin, Wochenmittel)',[{pts:wser('rhr'),cls:'s1'}],{unit:'/min'}),
+  fixed('Bauchumfang',[{pts:wser('waist'),cls:'s1'}],{unit:'cm',source:'Wochenwert'})
  ];
 }
 function compareChartHTML(idA,idB){
@@ -1236,12 +1254,33 @@ function historicalComparisonHTML(){
 function renderTrend(){
  const asOf=today();
  const overview=experimentOverview(S,asOf);
- $('#v-trend').innerHTML=`${experimentOverviewHTML(overview,asOf)}${experimentSummaryHTML(experimentSummary(S,asOf))}${historicalComparisonHTML()}${experimentDataBasisHTML(overview)}<div class="panel">${chartSet().join('')}</div>
+ const dateFormat={day:'2-digit',month:'2-digit',year:'numeric'};
+ $('#v-trend').innerHTML=`${experimentOverviewHTML(overview,asOf)}${experimentSummaryHTML(experimentSummary(S,asOf))}${historicalComparisonHTML()}${experimentDataBasisHTML(overview)}
+ <section class="panel fixed-charts" aria-labelledby="fixedChartsHeading"><h2 id="fixedChartsHeading">Diagramme</h2>
+ <p class="sub">Zeitraum: ${fd(overview.range.start,dateFormat)} – ${fd(overview.range.end,dateFormat)}</p>
+ <p class="sub">Die Punkte zeigen gespeicherte Messwerte. Linien verbinden diese Werte. Der modellierte Trend wird separat in der Zusammenfassung oben berechnet.</p>
+ <p class="sub">Auch vorab eingetragene Werte innerhalb des konfigurierten Zeitraums können erscheinen.</p>
+ ${chartSet(true).join('')}</section>
  <div class="panel"><h2>Vergleich zweier Werte</h2>
  <div class="row"><label for="cmpA"><b>Wert A</b></label><select id="cmpA">${METRICS.map(m=>`<option value="${m.id}"${m.id==='c'?' selected':''}>${m.label}</option>`).join('')}</select></div>
  <div class="row"><label for="cmpB"><b>Wert B</b></label><select id="cmpB">${METRICS.map(m=>`<option value="${m.id}"${m.id==='k'?' selected':''}>${m.label}</option>`).join('')}</select></div>
  <div id="cmpChart">${compareChartHTML('c','k')}</div></div>`;
+ updateFixedChartScrollAccess();
 }
+function updateFixedChartScrollAccess(){
+ const narrow=window.matchMedia('(max-width:600px)').matches;
+ document.querySelectorAll('#v-trend .chart-viewport').forEach(viewport=>{
+  if(narrow){viewport.tabIndex=0;viewport.setAttribute('role','region');viewport.setAttribute('aria-label',`${viewport.dataset.chartLabel}: seitlich verschiebbares Diagramm`)}
+  else{viewport.removeAttribute('tabindex');viewport.removeAttribute('role');viewport.removeAttribute('aria-label')}
+ });
+}
+window.addEventListener('resize',updateFixedChartScrollAccess);
+$('#v-trend').addEventListener('keydown',e=>{
+ const viewport=e.target.closest('.chart-viewport');
+ if(!viewport||e.target!==viewport||!['ArrowLeft','ArrowRight'].includes(e.key))return;
+ viewport.scrollLeft+=e.key==='ArrowRight'?80:-80;
+ e.preventDefault();
+});
 $('#v-trend').addEventListener('change',e=>{
  if(e.target.id==='historicalArchive'){
   selectedArchiveIndex=Number(e.target.value);

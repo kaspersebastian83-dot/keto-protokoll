@@ -147,6 +147,17 @@ test.describe('Print output', () => {
     for (const heading of ['Verlauf im Überblick', 'Umsetzung', 'Kurven', 'Laborwerte', 'Medikation', 'Beschwerden', 'Notizen', 'Beobachtungen für das Gespräch', 'Fragen für die Besprechung', 'Quellen']) {
       expect(html).toContain(`<h2>${heading}</h2>`);
     }
+    const reportCharts = await page.evaluate(markup => {
+      const report = new DOMParser().parseFromString(markup, 'text/html');
+      return { figures: report.querySelectorAll('.cg figure.chart').length,
+        svgs: report.querySelectorAll('.cg svg').length,
+        screenOnly: report.querySelectorAll('.cg .chart-viewport, .cg .chart-scroll-hint, .cg .chart-fixed').length,
+        text: report.body.textContent };
+    }, html);
+    expect(reportCharts.figures).toBe(5);
+    expect(reportCharts.svgs).toBe(5);
+    expect(reportCharts.screenOnly).toBe(0);
+    expect(reportCharts.text).not.toContain('Diagramm seitlich verschieben');
     expect((html.match(/<ul class="refs">(.*?)<\/ul>/s)[1].match(/<li>/g) || []).length).toBe(13);
   });
 

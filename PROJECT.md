@@ -299,27 +299,27 @@ Added configurable measurement schedules, the schedule-aware Today view, the wee
 
 P3 provides descriptive analysis only. It does not add diagnostic, causal, ranking, or health-scoring behavior.
 
-### P4 — Analysis presentation and comparison UX — PLANNED
+### P4 — Analysis presentation and comparison UX — IN PROGRESS
 
 Purpose: improve how existing analysis is presented and explored without changing the underlying health interpretation model.
 
-#### P4.1 — Chart readability and context
+#### P4.1 — Chart readability and context — COMPLETE
 
-Potential goals include clearer chart titles, units, legends, and empty states; consistent observation-range and data-basis context; improved narrow-screen readability and accessibility; and a clearer distinction between raw observations and modeled trends. No new statistical models are proposed.
+The seven fixed Verlauf charts now show titles, units, plotted-value counts, configured-period and observation context, clearer empty states, a non-color BP series distinction, readable narrow-screen chart scrolling, and accessible descriptions. Chart mathematics and medical interpretation are unchanged.
 
-#### P4.2 — Historical comparison visualization
+#### P4.2 — Historical comparison visualization — PLANNED
 
 Potential goals include visual presentation of current and archived-period trends using P3.3 period and cutoff semantics. The presentation should avoid winner/better/worse framing and should not imply equal observation windows when they differ. This is a visualization extension of P3.3, not new medical analysis.
 
-#### P4.3 — Two-variable comparison UX
+#### P4.3 — Two-variable comparison UX — PLANNED
 
 Potential goals include improving the existing Wert A / Wert B workflow, selected-variable context, axis and unit labels, mobile presentation, and empty or insufficient-data states. Correlation coefficients, significance testing, and causal interpretation are out of scope; they would require a separately defined evidence/statistics phase.
 
-#### P4.4 — Analysis accessibility and final polish
+#### P4.4 — Analysis accessibility and final polish — PLANNED
 
 Potential goals include keyboard and accessibility review, responsive behavior, screen-reader-friendly labels, print/screen consistency where relevant, and consistency across overview, summary, charts, and comparison views.
 
-P4 is a roadmap direction. Each subphase must be inspected and scoped before implementation. These bullets are not committed requirements.
+Remaining P4 subphases are roadmap directions. Each must be inspected and scoped before implementation. Their bullets are not committed requirements.
 
 ### Later possibilities
 

@@ -322,4 +322,58 @@ test.describe('iPhone-sized WebKit smoke checks', () => {
     await expect(page.locator('#cmpA')).toBeVisible();
     await expect(page.locator('#cmpB')).toBeVisible();
   });
+
+  test('fixed charts keep readable SVG width inside keyboard and touch scroll regions', async ({ page }) => {
+    const start = addDays(today(), -20), change = addDays(start, 7);
+    const meds = [{ id: 'syntheticMed', name: `Synthetic ${'long-name-'.repeat(12)}`,
+      dose: '10 mg', category: 'Medikament', startedAt: start, stoppedAt: null }];
+    const days = { [start]: { w: 80, g: 90, k: 1, sys: 120, dia: 80, c: 35 },
+      [change]: { w: 79, g: 92, k: 1.2, sys: 122, dia: 82, c: 40 } };
+    await gotoApp(page);
+    await seed(page, blankState({ settings: { ...blankState().settings, start, days: 28, meds }, days,
+      weeks: { 1: { rhr: 60, waist: 90 }, 2: { rhr: 61, waist: 89 } },
+      doseChanges: [{ date: change, medId: 'syntheticMed', oldDose: '5 mg', newDose: '10 mg' }] }));
+    await page.locator('nav button[data-tab="trend"]').tap();
+    const figures = page.locator('#v-trend .fixed-charts figure');
+    await expect(figures).toHaveCount(7);
+    await expect(page.locator('.fixed-charts > h2')).toBeVisible();
+    await expect(figures.first().locator('.chart-meta')).toBeVisible();
+    await expect(figures.first().locator('.chart-scroll-hint')).toBeVisible();
+    const widths = await page.locator('.fixed-charts .chart-viewport').evaluateAll(nodes => nodes.map(node => {
+      const box = node.getBoundingClientRect();
+      const svg = node.querySelector('svg').getBoundingClientRect();
+      const caption = node.closest('figure').querySelector('figcaption').getBoundingClientRect();
+      return { left: box.left, right: box.right, client: node.clientWidth, scroll: node.scrollWidth,
+        svg: svg.width, captionLeft: caption.left, captionRight: caption.right,
+        tabIndex: node.tabIndex, role: node.getAttribute('role'), label: node.getAttribute('aria-label') };
+    }));
+    expect(widths).toHaveLength(7);
+    const viewportWidth = page.viewportSize().width;
+    for (const item of widths) {
+      expect(item.left).toBeGreaterThanOrEqual(-1);
+      expect(item.right).toBeLessThanOrEqual(viewportWidth + 1);
+      expect(item.captionLeft).toBeGreaterThanOrEqual(-1);
+      expect(item.captionRight).toBeLessThanOrEqual(viewportWidth + 1);
+      expect(item.svg).toBeGreaterThanOrEqual(599);
+      expect(item.scroll).toBeGreaterThan(item.client);
+      expect(item.tabIndex).toBe(0);
+      expect(item.role).toBe('region');
+      expect(item.label).toContain('seitlich verschiebbares Diagramm');
+    }
+    const first = page.locator('.fixed-charts .chart-viewport').first();
+    await first.evaluate(node => { node.scrollLeft = 120; });
+    expect(await first.evaluate(node => node.scrollLeft)).toBeGreaterThan(0);
+    await first.focus();
+    const beforeKey = await first.evaluate(node => node.scrollLeft);
+    await page.keyboard.press('ArrowRight');
+    await expect.poll(() => first.evaluate(node => node.scrollLeft)).toBeGreaterThan(beforeKey);
+    await expect(figures.nth(3)).toContainText('Diastolisch: 2');
+    await expect(figures.nth(3)).toContainText('diastolisch (gestrichelt)');
+    for (const panel of ['#experimentOverview', '#experimentSummary', '#historicalComparison', '#dataBasis'])
+      await expect(page.locator(panel)).toBeVisible();
+    await expect(page.locator('#cmpA')).toBeVisible();
+    await expect(page.locator('#cmpB')).toBeVisible();
+    expect(await page.evaluate(() => document.documentElement.scrollWidth - document.documentElement.clientWidth))
+      .toBeLessThanOrEqual(2);
+  });
 });
