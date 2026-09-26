@@ -139,9 +139,9 @@ test.describe('Weekly check-in on Today', () => {
     await expect(page.locator(card)).toContainText('2 von 5 Wochenwerten erfasst');
   });
 
-  test('release and storage metadata stay unchanged apart from version 1.7.2', async ({ page }) => {
+  test('release and storage metadata stay unchanged apart from version 1.7.3', async ({ page }) => {
     await openOnTrackingDay(page, 7);
     expect(await page.evaluate(() => ({ version: VERSION, schema: DATA_VERSION, key: KEY, recovery: RECOVERY_KEY })))
-      .toEqual({ version: '1.7.2', schema: 6, key: 'ketoProtokoll_v1', recovery: 'ketoProtokoll_recovery_v1' });
+      .toEqual({ version: '1.7.3', schema: 6, key: 'ketoProtokoll_v1', recovery: 'ketoProtokoll_recovery_v1' });
   });
 });
