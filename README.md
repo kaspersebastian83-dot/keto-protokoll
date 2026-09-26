@@ -23,6 +23,7 @@ it silently, no PWA install prompt and no offline support in that case.
 
 - All entries live **only in the browser's localStorage** on the device you use.
   Nothing is sent anywhere, and nothing ends up in this repository.
+- Backup import can keep a browser-local recovery snapshot of the state that existed immediately before import. This remains local and is separate from exported backups.
 - Phone and PC have separate storage. Use *Einstellungen → Backup speichern / laden* to move data between devices.
 - Backups (`*.json`) and exports (`*.csv`) are git-ignored on purpose. Keep them out of the repo.
 - localStorage is tied to the exact URL/origin. Opening the file locally and via GitHub Pages
@@ -37,15 +38,19 @@ it silently, no PWA install prompt and no offline support in that case.
 ## Features
 
 - Daily tracking: weight, fasting glucose, blood ketones, two morning blood-pressure readings with a derived daily average, pulse, carbohydrates, energy and hunger, plan adherence, symptoms and notes, and medication adherence
-- Weekly tracking: waist, resting heart rate, sleep, stress, steps, and weekly notes
+- Weekly tracking: waist, resting heart rate, sleep, stress, steps, and weekly notes; Today can remind you when the current or recent check-in is due and open the existing Week form
 - Laboratory tracking: baseline and follow-up values, reference ranges, and changes over time
-- Trends: longitudinal charts, linear trend fitting, a two-variable comparison chart, and summary tables
+- Measurement schedules: configure the five objective morning measurements as daily, selected weekdays, or optional
+- Today: schedule-aware completion count; completed scheduled entries collapse accessibly, while non-due measurements remain available. Historical and future dates keep the full entry layout
+- Trends: seven longitudinal charts, linear trend fitting, an experiment overview and data-quality summary, trend readiness, and a modeled current-period summary across 14 metrics
+- Historical comparison: compare current and archived period trends descriptively, without ranking or claims of significance or causation
+- Two-variable comparison: compare two selected values over time
 - Medication tracking: medications and supplements, daily adherence, and dose-change history
 - Doctor-agreed alert thresholds
-- Tracking periods: extend an active period, archive completed periods, start a new period, and regenerate reports for archived periods
+- Tracking periods: extend an active period, archive a period, start a new period, regenerate archived reports, and compare the current period descriptively with an archived period
 - Literature: curated references, reading progress, and references included in the doctor report
 - Print: weekly A4 landscape fridge sheet, final doctor report, and saving as PDF through the browser print dialog
-- Data safety: local-only storage, JSON backup and restore, CSV export, schema migration, backup reminders, and persistent-storage request where supported
+- Data safety: local-only storage, JSON backup and restore, browser-local recovery around backup import, CSV export, schema migration, backup reminders, and persistent-storage request where supported
 - Installable PWA: home-screen installation, offline support, and GitHub Pages compatibility
 - Automated Playwright regression tests
 - GitHub Actions CI
