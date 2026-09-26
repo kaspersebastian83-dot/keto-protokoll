@@ -112,6 +112,11 @@ td.num,th.num{text-align:right}
 .overview-stat h3{font-size:.9rem;font-weight:500;color:var(--muted);margin:0 0 4px}
 .overview-stat p{margin:0}
 .overview-stat .sub{margin-top:3px}
+.summary-list{list-style:none;padding:0;margin:10px 0 12px}
+.summary-row{min-width:0;padding:10px 0;border-bottom:1px dashed var(--line);overflow-wrap:anywhere}
+.summary-row h3{font-size:.95rem;font-weight:500;margin:0 0 2px}
+.summary-value,.summary-basis{display:block}
+.summary-basis{color:var(--muted);font-size:.85rem}
 .quality-list{list-style:none;padding:0;margin:4px 0 14px}
 .quality-row{padding:10px 0;border-bottom:1px dashed var(--line);min-width:0}
 .quality-row strong{display:block;font-weight:500}
@@ -258,7 +263,7 @@ td.num,th.num{text-align:right}
 <script>
 const KEY='ketoProtokoll_v1';
 const RECOVERY_KEY='ketoProtokoll_recovery_v1';
-const VERSION='1.7.0'; // keep in sync with package.json, package-lock.json, and sw.js
+const VERSION='1.7.1'; // keep in sync with package.json, package-lock.json, and sw.js
 const SYMS=['Kopfschmerz','Müdigkeit','Muskelkrämpfe','Verdauung','Schwindel','Schlecht geschlafen','Heißhunger','Herzklopfen','Gereizt'];
 const DEFAULT_LABS=[['HbA1c','%'],['Glukose nüchtern','mg/dl'],['Gesamtcholesterin','mg/dl'],['LDL-Cholesterin','mg/dl'],['HDL-Cholesterin','mg/dl'],['Triglyzeride','mg/dl'],['Harnsäure','mg/dl'],['Kreatinin','mg/dl'],['eGFR','ml/min'],['GPT (ALT)','U/l'],['GOT (AST)','U/l'],['Gamma-GT','U/l'],['Natrium','mmol/l'],['Kalium','mmol/l'],['Magnesium','mmol/l'],['TSH','mU/l'],['CRP','mg/l']];
 const REFERENCES=[
@@ -1080,10 +1085,19 @@ function experimentOverview(state,asOf=today()){
  return {range,loggedDays,dueWeeks:due.length,completedWeeks,labs,daily,weekly};
 }
 function experimentOverviewHTML(data,asOf=today()){
- const {range,loggedDays,dueWeeks,completedWeeks,labs,daily,weekly}=data;
+ const {range,loggedDays,dueWeeks,completedWeeks,labs}=data;
  const dateFormat={day:'numeric',month:'long',year:'numeric'};
  const status=range.elapsed===0?`Beginnt am ${fd(range.start,dateFormat)}`:
   asOf>range.end?`Zeitraum abgeschlossen · ${range.length} Tage`:`Tag ${range.elapsed} von ${range.length}`;
+ return `<section class="panel experiment-overview" id="experimentOverview" aria-labelledby="experimentHeading"><h2 id="experimentHeading">Aktueller Durchgang</h2>
+ <div class="overview-grid">
+  <section class="overview-stat"><h3>Zeitraum</h3><p>${status}</p><p class="sub">${fd(range.start,dateFormat)} bis ${fd(range.end,dateFormat)}</p></section>
+  <section class="overview-stat"><h3>Tage mit Einträgen</h3><p>${range.elapsed?`${loggedDays} von ${range.elapsed} vergangenen Tagen`:'Noch keine vergangenen Tage.'}</p></section>
+  <section class="overview-stat"><h3>Wochen-Check-ins</h3><p>${dueWeeks?`${completedWeeks} von ${dueWeeks} fälligen vollständig`:'Noch kein Wochen-Check-in fällig.'}</p></section>
+  <section class="overview-stat"><h3>Labor</h3><p>${labs.base} Basiswerte · ${labs.end} Abschlusswerte</p></section>
+ </div></section>`;
+}
+function experimentDataBasisHTML({daily,weekly}){
  const rows=(metrics,values)=>metrics.map(([id,label])=>{
   const item=values[id];
   return `<li class="quality-row" data-quality="${id}"><strong>${label}</strong>
@@ -1091,21 +1105,60 @@ function experimentOverviewHTML(data,asOf=today()){
    <span class="quality-status">Trendberechnung ${item.trendReady?'möglich':'noch nicht möglich'}</span>
    ${id==='bp'?`<span class="quality-detail">2 Messungen vollständig: ${item.bpComplete} von ${item.count} Blutdrucktagen</span>`:''}</li>`;
  }).join('');
- return `<section class="panel experiment-overview" id="experimentOverview" aria-labelledby="experimentHeading"><h2 id="experimentHeading">Aktueller Durchgang</h2>
- <div class="overview-grid">
-  <section class="overview-stat"><h3>Zeitraum</h3><p>${status}</p><p class="sub">${fd(range.start,dateFormat)} bis ${fd(range.end,dateFormat)}</p></section>
-  <section class="overview-stat"><h3>Tage mit Einträgen</h3><p>${range.elapsed?`${loggedDays} von ${range.elapsed} vergangenen Tagen`:'Noch keine vergangenen Tage.'}</p></section>
-  <section class="overview-stat"><h3>Wochen-Check-ins</h3><p>${dueWeeks?`${completedWeeks} von ${dueWeeks} fälligen vollständig`:'Noch kein Wochen-Check-in fällig.'}</p></section>
-  <section class="overview-stat"><h3>Labor</h3><p>${labs.base} Basiswerte · ${labs.end} Abschlusswerte</p></section>
- </div></section>
- <section class="panel data-basis" id="dataBasis" aria-labelledby="dataBasisHeading"><h2 id="dataBasisHeading">Datenbasis für Auswertungen</h2>
+ return `<section class="panel data-basis" id="dataBasis" aria-labelledby="dataBasisHeading"><h2 id="dataBasisHeading">Datenbasis für Auswertungen</h2>
   <h3>Tägliche Werte</h3><ul class="quality-list">${rows(OVERVIEW_DAILY,daily)}</ul>
   <h3>Wöchentliche Werte</h3><ul class="quality-list">${rows(OVERVIEW_WEEKLY,weekly)}</ul>
   <p class="sub">Die Trendberechnung dieser App benötigt Werte aus mindestens drei Wochen.</p>
  </section>`;
 }
+const SUMMARY_METRICS=[
+ ['Gewicht','w','kg',1,'day'],['Blutzucker','g','mg/dl',0,'day'],['Ketone','k','mmol/l',2,'day'],
+ ['Blutdruck systolisch','sys','mmHg',0,'day'],['Blutdruck diastolisch','dia','mmHg',0,'day'],
+ ['Puls','p','/min',0,'day'],['Kohlenhydrate','c','g/Tag',0,'day'],
+ ['Energie','en','1–5',1,'day'],['Hunger','hu','1–5',1,'day'],
+ ['Bauchumfang','waist','cm',1,'week'],['Ruhepuls','rhr','/min',0,'week'],
+ ['Schlaf','sleep','h',1,'week'],['Stress','stress','0–100',0,'week'],['Schritte','steps','/Tag',0,'week']
+];
+function trendSummaryFromPairs(pairs){
+ const fit=trendFit(pairs);
+ if(!fit)return null;
+ const start=fit.a+fit.b*pairs[0][0],end=fit.a+fit.b*pairs.at(-1)[0];
+ return {start,end,delta:end-start};
+}
+function experimentSummary(state,asOf=today()){
+ const range=experimentRange(state.settings.start,Math.max(7,Number(state.settings.days)||90),asOf);
+ if(!range.elapsed)return {started:false,rows:[]};
+ const days=overviewDays(state.days,range);
+ const rows=SUMMARY_METRICS.flatMap(([label,id,unit,digits,source])=>{
+  const pairs=overviewWeeklyPairs(id,source,days,state.weeks,range);
+  const trend=trendSummaryFromPairs(pairs);
+  if(!trend)return [];
+  const count=source==='week'?pairs.length:days.filter(({day})=>
+   typeof day[id]==='number'&&Number.isFinite(day[id])).length;
+  return [{label,id,unit,digits,count,weeks:pairs.length,...trend}];
+ });
+ return {started:true,rows};
+}
+function experimentSummaryHTML(summary){
+ const rows=summary.rows.map(row=>{
+  const rounded=Number(row.delta.toFixed(row.digits));
+  const sign=rounded>0?'+':rounded<0?'−':'±';
+  const unit=row.unit?` ${row.unit}`:'';
+  return `<li class="summary-row" data-summary="${row.id}"><h3>${row.label}</h3>
+   <span class="summary-value">${fmt(row.start,row.digits)} → ${fmt(row.end,row.digits)}${unit} · Δ ${sign}${fmt(Math.abs(rounded),row.digits)}${unit}</span>
+   <span class="summary-basis">Datenbasis: ${row.count} ${row.count===1?'Wert':'Werte'} · ${row.weeks} ${row.weeks===1?'Woche':'Wochen'}</span></li>`;
+ }).join('');
+ const content=!summary.started?'<p>Der Durchgang hat noch nicht begonnen.</p>':
+  !summary.rows.length?'<p>Für eine Trendzusammenfassung liegen noch nicht genügend Wochen mit Daten vor.</p>':
+  `<ul class="summary-list">${rows}</ul>
+   <p class="sub">Anfang und Ende sind modellierte Werte aus dem linearen Trend über die vorhandenen Wochen, keine einzelnen ersten oder letzten Messungen. Die Zusammenfassung beschreibt aufgezeichnete Daten; sie bewertet weder statistische Signifikanz noch Ursachen.</p>
+   <p class="sub">Auch eine laufende Woche kann berücksichtigt werden, sobald Werte vorliegen; der Trend kann sich dadurch noch verändern.</p>`;
+ return `<section class="panel experiment-summary" id="experimentSummary" aria-labelledby="experimentSummaryHeading"><h2 id="experimentSummaryHeading">Zusammenfassung des bisherigen Verlaufs</h2>${content}</section>`;
+}
 function renderTrend(){
- $('#v-trend').innerHTML=`${experimentOverviewHTML(experimentOverview(S))}<div class="panel">${chartSet().join('')}</div>
+ const asOf=today();
+ const overview=experimentOverview(S,asOf);
+ $('#v-trend').innerHTML=`${experimentOverviewHTML(overview,asOf)}${experimentSummaryHTML(experimentSummary(S,asOf))}${experimentDataBasisHTML(overview)}<div class="panel">${chartSet().join('')}</div>
  <div class="panel"><h2>Vergleich zweier Werte</h2>
  <div class="row"><label for="cmpA"><b>Wert A</b></label><select id="cmpA">${METRICS.map(m=>`<option value="${m.id}"${m.id==='c'?' selected':''}>${m.label}</option>`).join('')}</select></div>
  <div class="row"><label for="cmpB"><b>Wert B</b></label><select id="cmpB">${METRICS.map(m=>`<option value="${m.id}"${m.id==='k'?' selected':''}>${m.label}</option>`).join('')}</select></div>
