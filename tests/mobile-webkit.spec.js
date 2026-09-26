@@ -158,6 +158,40 @@ test.describe('iPhone-sized WebKit smoke checks', () => {
     expect(await page.evaluate(() => document.documentElement.scrollWidth - document.documentElement.clientWidth)).toBeLessThanOrEqual(2);
   });
 
+  test('commitment progress and long local text fit the phone without crowding measurements', async ({ page }) => {
+    await gotoApp(page);
+    await seed(page, blankState({ settings: { ...blankState().settings, commitment: {
+      enabled: true, statement: 'Synthetic statement',
+      reason: 'Langer synthetischer Grund '.repeat(5),
+      agreedRule: 'Synthetische Vereinbarung '.repeat(7),
+    } } }));
+    const card = page.locator('#commitmentToday');
+    await expect(card).toContainText('Tag 1 von 90');
+    const box = await card.boundingBox();
+    expect(box.width).toBeLessThanOrEqual(page.viewportSize().width);
+    expect(box.height).toBeLessThan(280);
+    expect(await page.evaluate(() => document.documentElement.scrollWidth - document.documentElement.clientWidth)).toBeLessThanOrEqual(2);
+    await card.locator('summary').tap();
+    await expect(card).toContainText('Synthetische Vereinbarung');
+    expect(await page.evaluate(() => document.documentElement.scrollWidth - document.documentElement.clientWidth)).toBeLessThanOrEqual(2);
+    await expect(page.locator('#todayDue #f_w')).toBeVisible();
+    for (const value of ['y', 't', 'n'])
+      expect((await page.locator(`[data-plan="${value}"]`).boundingBox()).height).toBeGreaterThanOrEqual(44);
+    await page.locator('nav button[data-tab="set"]').tap();
+    await expect(page.locator('#s_commit_reason')).toHaveValue('Langer synthetischer Grund '.repeat(5));
+    expect(await page.evaluate(() => document.documentElement.scrollWidth - document.documentElement.clientWidth)).toBeLessThanOrEqual(2);
+    await seed(page, blankState({ settings: { ...blankState().settings, start: addDays(today(), -90), commitment: {
+      enabled: true, statement: 'Synthetic statement', reason: 'Synthetic reason', agreedRule: 'Synthetic rule',
+    } } }));
+    await expect(page.locator('#commitmentToday')).toContainText('Der geplante Zeitraum ist abgeschlossen.');
+    const finishedCard = await page.locator('#commitmentToday').boundingBox();
+    expect(finishedCard.x + finishedCard.width).toBeLessThanOrEqual(page.viewportSize().width);
+    for (const button of await page.locator('#commitmentToday .btns button').all())
+      expect((await button.boundingBox()).height).toBeGreaterThanOrEqual(44);
+    expect(await page.evaluate(() => document.documentElement.scrollWidth - document.documentElement.clientWidth)).toBeLessThanOrEqual(2);
+    await expect(page.locator('#f_w')).toBeVisible();
+  });
+
   test('completed summary wraps safely and its original input stays usable', async ({ page }) => {
     await gotoApp(page);
     await seed(page, blankState({ days: { [today()]: { w: 820 } } }));

@@ -22,7 +22,7 @@ test.describe('Dated carbohydrate goals and agreed thresholds', () => {
       };
     });
     expect(result).toEqual({
-      version: 6, goal: 42, alerts: oldAlerts,
+      version: 7, goal: 42, alerts: oldAlerts,
       goals: [{ date: null, value: 42 }], history: [{ date: null, value: oldAlerts }],
       detached: true, idempotent: true,
     });

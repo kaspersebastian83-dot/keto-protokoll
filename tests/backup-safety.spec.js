@@ -154,7 +154,7 @@ test.describe('Safe backup import and local recovery', () => {
     expect(confirmation).toContain('2026-09-01');
     expect(confirmation).toContain('Erfasste Tage: 2');
     expect(confirmation).toContain('Archivierte Durchgänge: 1');
-    expect(confirmation).toContain('Datenversion: 6');
+    expect(confirmation).toContain('Datenversion: 7');
     expect(confirmation).toContain('aktuellen Browserdaten werden ersetzt');
     expect(confirmation).toContain('lokale Sicherheitskopie');
     const result = await page.evaluate(() => ({
@@ -220,7 +220,7 @@ test.describe('Safe backup import and local recovery', () => {
     page.once('dialog', dialog => dialog.accept());
     await page.click('#restoreRecovery');
     expect(await page.evaluate(() => ({ name: S.settings.name, version: S.dataVersion, med: S.settings.meds[0], recovery: localStorage.getItem(RECOVERY_KEY) }))).toEqual({
-      name: legacy.settings.name, version: 6,
+      name: legacy.settings.name, version: 7,
       med: { ...legacy.settings.meds[0], startedAt: null, stoppedAt: null }, recovery: null,
     });
   });
@@ -258,7 +258,7 @@ test.describe('Safe backup import and local recovery', () => {
       live: localStorage.getItem(KEY), recovery: localStorage.getItem(RECOVERY_KEY),
       name: S.settings.name, days: S.days, dataVersion: S.dataVersion,
     }));
-    expect(result).toEqual({ live: null, recovery: null, name: '', days: {}, dataVersion: 6 });
+    expect(result).toEqual({ live: null, recovery: null, name: '', days: {}, dataVersion: 7 });
   });
 
   test('recovery-write failure aborts import before replacing S or the live key', async ({ page }) => {

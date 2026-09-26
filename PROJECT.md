@@ -299,9 +299,9 @@ Added configurable measurement schedules, the schedule-aware Today view, the wee
 
 P3 provides descriptive analysis only. It does not add diagnostic, causal, ranking, or health-scoring behavior.
 
-### P4 — Analysis presentation and comparison UX — IN PROGRESS
+### P4 — Analysis presentation, commitment, and comparison UX — IN PROGRESS
 
-Purpose: improve how existing analysis is presented and explored without changing the underlying health interpretation model.
+Purpose: improve how existing analysis is presented and explored, and support completion of a finite user-chosen experiment, without changing the underlying health interpretation model.
 
 #### P4.1 — Chart readability and context — COMPLETE
 
@@ -311,15 +311,19 @@ The seven fixed Verlauf charts now show titles, units, plotted-value counts, con
 
 Potential goals include visual presentation of current and archived-period trends using P3.3 period and cutoff semantics. The presentation should avoid winner/better/worse framing and should not imply equal observation windows when they differ. This is a visualization extension of P3.3, not new medical analysis.
 
-#### P4.3 — Two-variable comparison UX — PLANNED
+#### P4.3 — 90-Day Commitment Mode — COMPLETE
+
+Optional Commitment Mode uses the existing experiment timeline and daily Ja/Teils/Nein self-assessment. It adds local-only personal context, factual progress and 28-day counts, neutral milestones, and a gentle response after a difficult day. It does not change medical targets or analysis.
+
+#### P4.4 — Two-variable comparison UX — PLANNED
 
 Potential goals include improving the existing Wert A / Wert B workflow, selected-variable context, axis and unit labels, mobile presentation, and empty or insufficient-data states. Correlation coefficients, significance testing, and causal interpretation are out of scope; they would require a separately defined evidence/statistics phase.
 
-#### P4.4 — Analysis accessibility and final polish — PLANNED
+#### P4.5 — Analysis accessibility and final polish — PLANNED
 
 Potential goals include keyboard and accessibility review, responsive behavior, screen-reader-friendly labels, print/screen consistency where relevant, and consistency across overview, summary, charts, and comparison views.
 
-Remaining P4 subphases are roadmap directions. Each must be inspected and scoped before implementation. Their bullets are not committed requirements.
+The remaining P4 subphases are roadmap directions. Each must be inspected and scoped before implementation. Their bullets are not committed requirements.
 
 ### Later possibilities
 

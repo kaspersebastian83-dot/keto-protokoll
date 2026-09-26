@@ -266,7 +266,7 @@ test.describe('Quick Today entry', () => {
     await page.locator('#todayExtraSummary').click();
     expect(await page.evaluate(() => ({ day: S.days[today()], stored: JSON.parse(localStorage.getItem(KEY)).days[today()],
       schema: S.dataVersion, lastBackup: S.settings.lastBackup, recovery: localStorage.getItem(RECOVERY_KEY) })))
-      .toEqual({ day, stored: day, schema: 6, lastBackup: '2026-09-01', recovery: null });
+      .toEqual({ day, stored: day, schema: 7, lastBackup: '2026-09-01', recovery: null });
   });
 
   test('Today navigation switches to full history and back to quick entry', async ({ page }) => {

@@ -42,7 +42,7 @@ test.describe('Measurement schedule foundation', () => {
     await seed(page, legacy);
     const result = await page.evaluate(() => ({ version: S.dataVersion, schedule: S.settings.measurementSchedule,
       days: S.days, idempotent: (() => { const before = JSON.stringify(S); migrate(S); return JSON.stringify(S) === before; })() }));
-    expect(result).toEqual({ version: 6, schedule: allDaily(), days: legacy.days, idempotent: true });
+    expect(result).toEqual({ version: 7, schedule: allDaily(), days: legacy.days, idempotent: true });
   });
 
   test('a current v6 schedule survives the real load path unchanged', async ({ page }) => {
@@ -52,7 +52,7 @@ test.describe('Measurement schedule foundation', () => {
     await gotoApp(page);
     await seed(page, scheduleState(schedule));
     expect(await page.evaluate(() => ({ version: S.dataVersion, schedule: S.settings.measurementSchedule })))
-      .toEqual({ version: 6, schedule });
+      .toEqual({ version: 7, schedule });
   });
 
   test('a v5 backup without a schedule imports as v6 with all-daily defaults', async ({ page }) => {
@@ -64,7 +64,7 @@ test.describe('Measurement schedule foundation', () => {
     await importFile(page, legacy);
     await expect.poll(() => page.evaluate(() => S.settings.name)).toBe('Synthetic legacy profile');
     expect(await page.evaluate(() => ({ version: S.dataVersion, schedule: S.settings.measurementSchedule,
-      ketones: S.days[today()].k }))).toEqual({ version: 6, schedule: allDaily(), ketones: 0.8 });
+      ketones: S.days[today()].k }))).toEqual({ version: 7, schedule: allDaily(), ketones: 0.8 });
   });
 
   test('malformed v6 schedules are rejected before confirmation or replacement', async ({ page }) => {
