@@ -223,4 +223,32 @@ test.describe('iPhone-sized WebKit smoke checks', () => {
     await button.tap();
     await expect(page.locator('#wsel')).toHaveValue('1');
   });
+
+  test('experiment overview and data-basis rows fit before charts and comparison', async ({ page }) => {
+    await gotoApp(page);
+    await seed(page, blankState({ days: { [today()]: { w: 80, c: 30, k: 1 } } }));
+    await page.locator('nav button[data-tab="trend"]').tap();
+    await expect(page.locator('#experimentOverview')).toBeVisible();
+    await expect(page.locator('#dataBasis')).toBeVisible();
+    const width = page.viewportSize().width;
+    for (const selector of ['#experimentOverview .overview-stat', '#dataBasis .quality-row']) {
+      const boxes = await page.locator(selector).evaluateAll(nodes => nodes.map(node => {
+        const box = node.getBoundingClientRect();
+        return { left: box.left, right: box.right };
+      }));
+      expect(boxes.length).toBeGreaterThan(0);
+      for (const box of boxes) {
+        expect(box.left, selector).toBeGreaterThanOrEqual(-1);
+        expect(box.right, selector).toBeLessThanOrEqual(width + 1);
+      }
+    }
+    expect(await page.evaluate(() => document.documentElement.scrollWidth - document.documentElement.clientWidth)).toBeLessThanOrEqual(2);
+    await expect(page.locator('#v-trend .chart').first()).toBeVisible();
+    const order = await page.locator('#v-trend > *').evaluateAll(nodes => nodes.map(node => node.id||node.querySelector('h2')?.textContent));
+    expect(order.slice(0,2)).toEqual(['experimentOverview','dataBasis']);
+    await expect(page.locator('#cmpA')).toBeVisible();
+    await expect(page.locator('#cmpB')).toBeVisible();
+    await page.locator('#cmpA').selectOption('w');
+    await expect(page.locator('#cmpChart')).toContainText('Gewicht');
+  });
 });
