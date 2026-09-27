@@ -98,6 +98,35 @@ textarea{min-height:64px;resize:vertical}
 .carb-preview p{margin:3px 0}
 .carb-preview .btn{width:100%;margin-top:8px}
 .carb-dialog .sub{margin:5px 0}
+.gi-intro strong{display:block;margin:10px 0;color:var(--ink)}
+.gi-actions{display:flex;flex-wrap:wrap;gap:8px;margin:0 0 16px}
+.gi-actions .btn{min-height:44px}
+.gi-controls{display:grid;grid-template-columns:2fr 1fr 1fr;gap:10px;margin:12px 0}
+.gi-controls label{display:block;font-weight:500;font-size:.9rem}
+.gi-controls input,.gi-controls select{display:block;min-height:44px;margin-top:4px}
+.gi-controls select{height:44px}
+.gi-filter{display:flex;flex-wrap:wrap;gap:6px;margin:12px 0}
+.gi-filter button{min-height:44px}
+.gi-filter button[aria-pressed="true"]{background:var(--ink);color:var(--paper);border-color:var(--ink)}
+.gi-list{list-style:none;padding:0;margin:0}
+.gi-head,.gi-item{display:grid;grid-template-columns:minmax(0,2fr) 90px minmax(0,1.2fr) minmax(0,1.6fr);gap:10px;align-items:start}
+.gi-head{font-weight:600;color:var(--muted);padding:8px;border-bottom:1px solid var(--line)}
+.gi-item{padding:12px 8px;border-bottom:1px solid var(--line);overflow-wrap:anywhere}
+.gi-item strong,.gi-item span{display:block}
+.gi-value{font-size:1.1rem;font-weight:600}
+.gi-class{font-size:.84rem;color:var(--muted)}
+.gi-item details{grid-column:1/-1}
+.gi-item summary{min-height:44px;display:flex;align-items:center;cursor:pointer;color:var(--ink)}
+.gi-item details p{margin:4px 0;font-size:.88rem}
+.gi-muted{color:var(--muted);font-size:.88rem}
+@media(max-width:600px){
+ .gi-controls{grid-template-columns:minmax(0,1fr)}
+ .gi-head{display:none}
+ .gi-item{display:grid;grid-template-columns:minmax(0,1fr) auto;border:1px solid var(--line);border-radius:6px;margin:10px 0;padding:12px}
+ .gi-item .gi-food{grid-column:1}
+ .gi-item .gi-number{grid-column:2;text-align:right}
+ .gi-item .gi-category,.gi-item .gi-note,.gi-item details{grid-column:1/-1}
+}
 .weekly-checkin-card p:not(.sub){margin:10px 0 12px}
 .weekly-checkin-card .btn{min-height:44px}
 #v-day input,#v-day .scale button,#v-day .seg button,#v-day .chips button,#v-day .datebar .btn,#v-week input,#v-week select,#v-week .datebar .btn{min-height:44px}
@@ -312,6 +341,7 @@ td.num,th.num{text-align:right}
   <section id="v-print" hidden></section>
   <section id="v-set" hidden></section>
   <section id="v-lit" hidden></section>
+  <section id="v-gi" hidden></section>
  </main>
 </div>
 <div id="status" role="status" aria-live="polite"></div>
@@ -321,6 +351,7 @@ td.num,th.num{text-align:right}
  <p id="carbCalcHelp" class="sub">EU-Nährwertangabe: Ballaststoffe nicht zusätzlich abziehen.</p>
  <div id="carbCalcRows"></div>
  <button type="button" class="btn" id="carbCalcAdd">Zutat hinzufügen</button>
+ <button type="button" class="btn" id="giGuideOpen">GI nachschlagen</button>
  <p id="carbCalcTotal" class="carb-total"></p>
  <p id="carbCalcRound" class="sub" hidden></p>
  <div id="carbCalcPreview"></div>
@@ -333,7 +364,7 @@ td.num,th.num{text-align:right}
 <script>
 const KEY='ketoProtokoll_v1';
 const RECOVERY_KEY='ketoProtokoll_recovery_v1';
-const VERSION='1.9.0'; // keep in sync with package.json, package-lock.json, and sw.js
+const VERSION='1.10.0'; // keep in sync with package.json, package-lock.json, and sw.js
 const SYMS=['Kopfschmerz','Müdigkeit','Muskelkrämpfe','Verdauung','Schwindel','Schlecht geschlafen','Heißhunger','Herzklopfen','Gereizt'];
 const DEFAULT_LABS=[['HbA1c','%'],['Glukose nüchtern','mg/dl'],['Gesamtcholesterin','mg/dl'],['LDL-Cholesterin','mg/dl'],['HDL-Cholesterin','mg/dl'],['Triglyzeride','mg/dl'],['Harnsäure','mg/dl'],['Kreatinin','mg/dl'],['eGFR','ml/min'],['GPT (ALT)','U/l'],['GOT (AST)','U/l'],['Gamma-GT','U/l'],['Natrium','mmol/l'],['Kalium','mmol/l'],['Magnesium','mmol/l'],['TSH','mU/l'],['CRP','mg/l']];
 const REFERENCES=[
@@ -413,7 +444,62 @@ const REFERENCES=[
   title:'The Art and Science of Low Carbohydrate Living',
   citation:'Phinney SD, Volek JS. The Art and Science of Low Carbohydrate Living. Beyond Obesity LLC; 2011. ISBN 9780983490708.',
   access:'Kostenpflichtig (Buch)',
-  note:'Grundlagenwerk zur praktischen Umsetzung einer kohlenhydratreduzierten Ernährung.'}
+ note:'Grundlagenwerk zur praktischen Umsetzung einer kohlenhydratreduzierten Ernährung.'}
+];
+// Screen-only reference data. These factual values are never added to S or exports.
+// 2008 values are the published Table 1 multi-study means, not product guarantees.
+const GI_REVIEW_ROWS=[
+ ['weissbrot','Weißbrot','Brot & Backwaren',75,'Weizenbrot','White wheat bread'],
+ ['vollkornbrot','Vollkornbrot','Brot & Backwaren',74,'Weizenvollkornbrot','Whole wheat/whole meal bread'],
+ ['haferbrei','Haferbrei aus Haferflocken','Getreide & Frühstück',55,'klassische Haferflocken, als Brei','Porridge, rolled oats'],
+ ['instant-haferbrei','Instant-Haferbrei','Getreide & Frühstück',79,'Instantprodukt, als Brei','Instant oat porridge'],
+ ['muesli','Müsli','Getreide & Frühstück',57,'','Muesli'],
+ ['cornflakes','Cornflakes','Getreide & Frühstück',81,'','Cornflakes'],
+ ['weisser-reis','Weißer Reis','Reis',73,'gekocht','White rice, boiled'],
+ ['vollkornreis','Vollkornreis','Reis',68,'gekocht','Brown rice, boiled'],
+ ['gerste','Gerste','Getreide & Frühstück',28,'','Barley'],
+ ['spaghetti-weiss','Spaghetti, weiß','Pasta & Nudeln',49,'','Spaghetti, white'],
+ ['spaghetti-vollkorn','Spaghetti, Vollkorn','Pasta & Nudeln',48,'','Spaghetti, whole meal'],
+ ['couscous','Couscous','Getreide & Frühstück',65,'','Couscous'],
+ ['kartoffeln-gekocht','Kartoffeln, gekocht','Kartoffeln & Gemüse',78,'gekocht','Potato, boiled'],
+ ['kartoffelpueree-instant','Kartoffelpüree, instant','Kartoffeln & Gemüse',87,'Instantpüree','Potato, instant mash'],
+ ['suesskartoffel','Süßkartoffel','Kartoffeln & Gemüse',63,'gekocht','Sweet potato, boiled'],
+ ['karotten','Karotten','Kartoffeln & Gemüse',39,'gekocht','Carrots, boiled'],
+ ['zuckermais','Zuckermais','Kartoffeln & Gemüse',52,'','Sweet corn'],
+ ['apfel','Apfel','Obst',36,'roh','Apple, raw'],
+ ['orange','Orange','Obst',43,'roh','Orange, raw'],
+ ['banane','Banane','Obst',51,'roh','Banana, raw'],
+ ['ananas','Ananas','Obst',59,'roh','Pineapple, raw'],
+ ['wassermelone','Wassermelone','Obst',76,'roh','Watermelon, raw'],
+ ['vollmilch','Vollmilch','Milchprodukte',39,'','Milk, full fat'],
+ ['magermilch','Magermilch','Milchprodukte',37,'','Milk, skim'],
+ ['fruchtjoghurt','Fruchtjoghurt','Milchprodukte',41,'','Yogurt, fruit'],
+ ['kichererbsen','Kichererbsen','Hülsenfrüchte',28,'','Chickpeas'],
+ ['linsen','Linsen','Hülsenfrüchte',32,'','Lentils'],
+ ['kidneybohnen','Kidneybohnen','Hülsenfrüchte',24,'','Kidney beans'],
+ ['speiseeis','Speiseeis','Süßes & Snacks',51,'','Ice cream'],
+ ['schokolade','Schokolade','Süßes & Snacks',40,'','Chocolate']
+];
+const GI_VARIABLE_CATEGORIES=new Set(['Brot & Backwaren','Getreide & Frühstück','Reis','Kartoffeln & Gemüse','Süßes & Snacks']);
+const GI_FOODS=[
+ ...GI_REVIEW_ROWS.map(([id,displayName,category,gi,preparation,sourceItem])=>({
+  id,displayName,category,gi,preparation,
+  variabilityNote:GI_VARIABLE_CATEGORIES.has(category)?'Produkte, Sorte und Zubereitung können deutlich abweichen.':'',
+  sourceType:'review_mean',sourceLabel:'Atkinson et al. 2008',sourceYear:2008,
+  pmid:'18835944',doi:'10.2337/dc08-1239',sourceIdentifier:`Tabelle 1: ${sourceItem}`
+ })),
+ {id:'ditsch-brezel',displayName:'Laugenbrezel, Ditsch',category:'Brot & Backwaren',gi:80,
+  preparation:'weiche Laugenbrezel; getestetes Produkt aus Deutschland',variabilityNote:'Der Wert gilt für das getestete Produkt; andere Brezeln können abweichen.',
+  sourceType:'tested_product',sourceLabel:'Atkinson et al. 2021',sourceYear:2021,
+  pmid:'34258626',doi:'10.1093/ajcn/nqab233',originalPmid:'26931667',originalDoi:'10.1038/ejcn.2016.9',sourceIdentifier:'Supplementtabelle 1, Nr. 209; Originalstudie Ref. 34'},
+ {id:'paderborner-lieken',displayName:'Paderborner, Lieken Urkorn',category:'Brot & Backwaren',gi:62,
+  preparation:'Roggen-Weizen-Sauerteigbrot; getestetes Produkt aus Deutschland',variabilityNote:'Der Wert gilt für das getestete Produkt; andere Brote können abweichen.',
+  sourceType:'tested_product',sourceLabel:'Atkinson et al. 2021',sourceYear:2021,
+  pmid:'34258626',doi:'10.1093/ajcn/nqab233',originalPmid:'26931667',originalDoi:'10.1038/ejcn.2016.9',sourceIdentifier:'Supplementtabelle 1, Nr. 218; Originalstudie Ref. 34'},
+ {id:'kraftkerni-lieken',displayName:'Kraftkerni, Lieken Urkorn',category:'Brot & Backwaren',gi:55,
+  preparation:'Roggenvollkornbrot mit ganzen Körnern und Sonnenblumenkernen; getestetes Produkt aus Deutschland',variabilityNote:'Der Wert gilt für das getestete Produkt; andere Brote können abweichen.',
+  sourceType:'tested_product',sourceLabel:'Atkinson et al. 2021',sourceYear:2021,
+  pmid:'34258626',doi:'10.1093/ajcn/nqab233',originalPmid:'26931667',originalDoi:'10.1038/ejcn.2016.9',sourceIdentifier:'Supplementtabelle 1, Nr. 224; Originalstudie Ref. 34'}
 ];
 const $=s=>document.querySelector(s);
 
@@ -1125,6 +1211,7 @@ $('#carbCalcAdd').addEventListener('click',()=>{
  const row=carbCalcRow();carbCalcRows.push(row);carbCalcRenderRows();$(`#carbAmount${row.id}`).focus();
 });
 $('#carbCalcClose').addEventListener('click',()=>carbCalcDialog.close());
+$('#giGuideOpen').addEventListener('click',()=>{carbCalcDialog.close();show('gi');$('#giSearch').focus()});
 $('#carbCalcRows').addEventListener('input',e=>{
  const input=e.target,section=input.closest('[data-calc-row]'),row=carbCalcRows.find(item=>item.id===Number(section?.dataset.calcRow));
  if(!row||!['name','amount','per100'].includes(input.dataset.calcField))return;
@@ -1142,9 +1229,73 @@ $('#carbCalcPreview').addEventListener('click',e=>{
  const button=e.target.closest('[data-calc-transfer]');if(button)carbCalcTransfer(button.dataset.calcTransfer);
 });
 carbCalcDialog.addEventListener('close',()=>{
+ if(curTab==='gi'){$('#giSearch')?.focus();carbCalcDate=null;carbCalcLauncher=null;return}
  const launcher=carbCalcLauncher?.isConnected?carbCalcLauncher:$('#carbCalcOpen');
  if(launcher)launcher.focus();
  carbCalcDate=null;carbCalcLauncher=null;
+});
+
+/* ---------- GI food guide: static screen reference only ---------- */
+let giQuery='',giLevel='all',giCategory='all',giSort='name';
+const giClass=gi=>gi<=55?'Niedrig':gi<=69?'Mittel':'Hoch';
+const giSearchKey=value=>String(value).toLocaleLowerCase('de-DE').normalize('NFD')
+ .replace(/[\u0300-\u036f]/g,'').replace(/ß/g,'ss').replace(/ae/g,'a').replace(/oe/g,'o').replace(/ue/g,'u');
+function giVisibleFoods(){
+ const query=giSearchKey(giQuery.trim());
+ const foods=GI_FOODS.filter(food=>(!query||giSearchKey(food.displayName+' '+food.preparation).includes(query))&&
+  (giLevel==='all'||giClass(food.gi)===giLevel)&&
+  (giCategory==='all'||food.category===giCategory));
+ return foods.sort((a,b)=>giSort==='low'?a.gi-b.gi||a.displayName.localeCompare(b.displayName,'de'):
+  giSort==='high'?b.gi-a.gi||a.displayName.localeCompare(b.displayName,'de'):
+  a.displayName.localeCompare(b.displayName,'de'));
+}
+function giFoodHTML(food){
+ const sourceText=food.sourceType==='review_mean'?'Mittelwert aus mehreren Studien; einzelne Produkte und Zubereitungen können abweichen.':
+  'Wert des genau bezeichneten getesteten Produkts; nicht auf andere Produkte übertragbar.';
+ return `<li class="gi-item" data-gi-id="${food.id}">
+  <div class="gi-food"><strong>${esc(food.displayName)}</strong>${food.preparation?`<span class="gi-muted">${esc(food.preparation)}</span>`:''}</div>
+  <div class="gi-number"><span class="gi-value">GI ${food.gi}</span><span class="gi-class">${giClass(food.gi)}</span></div>
+  <span class="gi-category">${esc(food.category)}</span>
+  <span class="gi-note">${esc(food.variabilityNote||'Mittelwert aus mehreren Studien.')}</span>
+  <details><summary>Quelle und Details zu ${esc(food.displayName)}</summary>
+   <p><b>Quelle:</b> ${esc(food.sourceLabel)} · ${food.sourceYear}. ${sourceText}</p>
+   <p>${esc(food.sourceIdentifier)}</p>
+   <p>PMID ${food.pmid} · DOI ${food.doi}${food.originalPmid?` · Originalstudie PMID ${food.originalPmid}, DOI ${food.originalDoi}`:''}</p>
+  </details></li>`;
+}
+function renderGiResults(){
+ const foods=giVisibleFoods();
+ $('#giCount').textContent=`${foods.length} von ${GI_FOODS.length} Lebensmitteln`;
+ $('#giResults').innerHTML=foods.length?`<div class="gi-head" aria-hidden="true"><span>Lebensmittel</span><span>GI</span><span>Kategorie</span><span>Hinweis</span></div><ul class="gi-list">${foods.map(giFoodHTML).join('')}</ul>`:
+  '<p>Keine passenden Lebensmittel gefunden.</p>';
+ document.querySelectorAll('#giLevelFilter button').forEach(button=>button.setAttribute('aria-pressed',String(button.dataset.giLevel===giLevel)));
+}
+function renderGi(){
+ const categories=[...new Set(GI_FOODS.map(food=>food.category))].sort((a,b)=>a.localeCompare(b,'de'));
+ $('#v-gi').innerHTML=`<section class="panel gi-intro" aria-labelledby="giTitle"><h2 id="giTitle">GI-Lebensmittel</h2>
+  <p>Glykämischer Index (GI), Glukose = 100: Niedrig ≤55 · Mittel 56–69 · Hoch ≥70.</p>
+  <strong>Ein niedriger GI bedeutet nicht automatisch wenig Kohlenhydrate oder keto-geeignet.</strong>
+  <p>Der GI beschreibt die typische Blutzuckerwirkung der Kohlenhydrate eines getesteten Lebensmittels. Produkt, Sorte und Zubereitung können den Wert verändern. Der KH-Rechner zeigt die Kohlenhydratmenge anhand deiner Nährwertangaben.</p>
+  <p>Für Lebensmittel mit vernachlässigbaren verfügbaren Kohlenhydraten ist ein GI in der Regel nicht sinnvoll anwendbar.</p></section>
+  <div class="gi-actions"><button type="button" class="btn" id="giBack">Zurück zur Tagesansicht</button><button type="button" class="btn primary" id="giToCalc">KH berechnen</button></div>
+  <section class="panel" aria-label="GI-Lebensmittel durchsuchen"><div class="gi-controls">
+   <label for="giSearch">Lebensmittel suchen<input id="giSearch" type="search" autocomplete="off" value="${esc(giQuery)}"></label>
+   <label for="giCategory">Kategorie<select id="giCategory"><option value="all">Alle Kategorien</option>${categories.map(category=>`<option value="${esc(category)}"${giCategory===category?' selected':''}>${esc(category)}</option>`).join('')}</select></label>
+   <label for="giSort">Sortierung<select id="giSort"><option value="name"${giSort==='name'?' selected':''}>Lebensmittel A–Z</option><option value="low"${giSort==='low'?' selected':''}>GI niedrig → hoch</option><option value="high"${giSort==='high'?' selected':''}>GI hoch → niedrig</option></select></label>
+  </div><div id="giLevelFilter" class="gi-filter" role="group" aria-label="GI-Kategorie">${[['all','Alle'],['Niedrig','Niedrig'],['Mittel','Mittel'],['Hoch','Hoch']].map(([value,label])=>`<button type="button" class="btn" data-gi-level="${value}" aria-pressed="${giLevel===value}">${label}</button>`).join('')}</div>
+  <p id="giCount" class="gi-muted" role="status" aria-live="polite"></p><div id="giResults"></div></section>`;
+ renderGiResults();
+}
+$('#v-gi').addEventListener('input',e=>{if(e.target.id==='giSearch'){giQuery=e.target.value;renderGiResults()}});
+$('#v-gi').addEventListener('change',e=>{
+ if(e.target.id==='giCategory'){giCategory=e.target.value;renderGiResults()}
+ if(e.target.id==='giSort'){giSort=e.target.value;renderGiResults()}
+});
+$('#v-gi').addEventListener('click',e=>{
+ const button=e.target.closest('button');if(!button)return;
+ if(button.id==='giBack'){show('day');$('#carbCalcOpen')?.focus();return}
+ if(button.id==='giToCalc'){show('day');carbCalcOpen($('#carbCalcOpen'));return}
+ if(button.dataset.giLevel){giLevel=button.dataset.giLevel;renderGiResults()}
 });
 const BP_READING_FIELDS=['sys1','dia1','sys2','dia2'];
 $('#v-day').addEventListener('change',e=>{
@@ -2219,7 +2370,7 @@ $('#v-lit').addEventListener('change',e=>{
 });
 
 /* ---------- tabs ---------- */
-const R={day:renderDay,week:renderWeek,lab:renderLab,trend:renderTrend,print:renderPrint,set:renderSet,lit:renderLit};
+const R={day:renderDay,week:renderWeek,lab:renderLab,trend:renderTrend,print:renderPrint,set:renderSet,lit:renderLit,gi:renderGi};
 function show(tab){curTab=tab;document.querySelectorAll('nav button').forEach(b=>b.setAttribute('aria-selected',b.dataset.tab===tab));Object.keys(R).forEach(k=>$('#v-'+k).hidden=k!==tab);R[tab]();renderHead()}
 document.querySelector('nav').addEventListener('click',e=>{const b=e.target.closest('[data-tab]');if(b)show(b.dataset.tab)});
 $('#strip').addEventListener('click',e=>{const b=e.target.closest('[data-date]');if(!b)return;curDate=b.dataset.date;show('day')});

@@ -299,7 +299,7 @@ Added configurable measurement schedules, the schedule-aware Today view, the wee
 
 P3 provides descriptive analysis only. It does not add diagnostic, causal, ranking, or health-scoring behavior.
 
-### P4 — Analysis presentation, commitment, and comparison UX — IN PROGRESS
+### P4 — Analysis presentation, commitment, food reference, and comparison UX — IN PROGRESS
 
 Purpose: improve how existing analysis is presented and explored, and support completion of a finite user-chosen experiment, without changing the underlying health interpretation model.
 
@@ -319,15 +319,21 @@ Optional Commitment Mode uses the existing experiment timeline and daily Ja/Teil
 
 The local calculator uses EU-label carbohydrates per 100 g to total multiple ingredients and preview the selected date's remaining budget. Transfer explicitly adds to or replaces the existing daily carbohydrate value. Ingredient drafts stay temporary; favorites are deferred to P4.4.1.
 
-#### P4.5 — Two-variable comparison UX — PLANNED
+#### P4.5 — GI Food Guide — COMPLETE
+
+The bundled, offline GI guide contains a small curated set of sourced review means and identified tested products. It supports local search and filters and is reachable from the carb calculator. GI describes carbohydrate quality, not carbohydrate quantity or keto suitability. The guide does not change user data, reports, exports, or the calculator.
+
+#### P4.6 — Two-variable comparison UX — PLANNED
 
 Potential goals include improving the existing Wert A / Wert B workflow, selected-variable context, axis and unit labels, mobile presentation, and empty or insufficient-data states. Correlation coefficients, significance testing, and causal interpretation are out of scope; they would require a separately defined evidence/statistics phase.
 
-#### P4.6 — Analysis accessibility and final polish — PLANNED
+#### P4.7 — Analysis accessibility and final polish — PLANNED
 
 Potential goals include keyboard and accessibility review, responsive behavior, screen-reader-friendly labels, print/screen consistency where relevant, and consistency across overview, summary, charts, and comparison views.
 
 The remaining planned P4 subphases are roadmap directions. Each must be inspected and scoped before implementation. Their bullets are not committed requirements.
+
+Glycemic load calculation remains a possible later feature; it is not part of P4.5.
 
 ### Later possibilities
 
