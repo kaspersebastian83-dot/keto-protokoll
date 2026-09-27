@@ -38,6 +38,7 @@ it silently, no PWA install prompt and no offline support in that case.
 ## Features
 
 - Daily tracking: weight, fasting glucose, blood ketones, two morning blood-pressure readings with a derived daily average, pulse, carbohydrates, energy and hunger, plan adherence, symptoms and notes, and medication adherence
+- Local carb calculator: combine EU-label carbohydrates per 100 g across ingredients, preview the daily budget, then explicitly add or replace the existing daily value without a cloud lookup
 - Weekly tracking: waist, resting heart rate, sleep, stress, steps, and weekly notes; Today can remind you when the current or recent check-in is due and open the existing Week form
 - Laboratory tracking: baseline and follow-up values, reference ranges, and changes over time
 - Measurement schedules: configure the five objective morning measurements as daily, selected weekdays, or optional

@@ -27,6 +27,17 @@ test.describe('Daily entry', () => {
     expect(stored).toBe(1.25);
   });
 
+  test('daily carbohydrate zero is recorded and clearing it removes the value', async ({ page }) => {
+    await gotoApp(page);
+    await seed(page, blankState());
+    await page.locator('#f_c').fill('0');
+    await page.locator('#f_c').blur();
+    expect(await page.evaluate(() => S.days[today()].c)).toBe(0);
+    await page.locator('#f_c').fill('');
+    await page.locator('#f_c').blur();
+    expect(await page.evaluate(() => Object.hasOwn(S.days[today()], 'c'))).toBe(false);
+  });
+
   test('invalid text does not save and shows a status message', async ({ page }) => {
     await gotoApp(page);
     await seed(page, blankState());

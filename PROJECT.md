@@ -315,15 +315,19 @@ Potential goals include visual presentation of current and archived-period trend
 
 Optional Commitment Mode uses the existing experiment timeline and daily Ja/Teils/Nein self-assessment. It adds local-only personal context, factual progress and 28-day counts, neutral milestones, and a gentle response after a difficult day. It does not change medical targets or analysis.
 
-#### P4.4 — Two-variable comparison UX — PLANNED
+#### P4.4 — Carb Budget / Carb Calculator — COMPLETE
+
+The local calculator uses EU-label carbohydrates per 100 g to total multiple ingredients and preview the selected date's remaining budget. Transfer explicitly adds to or replaces the existing daily carbohydrate value. Ingredient drafts stay temporary; favorites are deferred to P4.4.1.
+
+#### P4.5 — Two-variable comparison UX — PLANNED
 
 Potential goals include improving the existing Wert A / Wert B workflow, selected-variable context, axis and unit labels, mobile presentation, and empty or insufficient-data states. Correlation coefficients, significance testing, and causal interpretation are out of scope; they would require a separately defined evidence/statistics phase.
 
-#### P4.5 — Analysis accessibility and final polish — PLANNED
+#### P4.6 — Analysis accessibility and final polish — PLANNED
 
 Potential goals include keyboard and accessibility review, responsive behavior, screen-reader-friendly labels, print/screen consistency where relevant, and consistency across overview, summary, charts, and comparison views.
 
-The remaining P4 subphases are roadmap directions. Each must be inspected and scoped before implementation. Their bullets are not committed requirements.
+The remaining planned P4 subphases are roadmap directions. Each must be inspected and scoped before implementation. Their bullets are not committed requirements.
 
 ### Later possibilities
 

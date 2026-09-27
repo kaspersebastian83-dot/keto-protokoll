@@ -79,6 +79,25 @@ textarea{min-height:64px;resize:vertical}
 .today-warning{display:block;color:var(--s2);font-size:.78rem;margin-top:4px}
 .today-extra>summary{font-size:1.05rem;font-weight:600;color:var(--ink)}
 .today-extra-count{font-size:.85rem;font-weight:400;color:var(--muted)}
+.carb-entry{flex-wrap:wrap}
+.carb-entry input{flex:1 1 100px}
+.carb-entry .btn{min-height:44px}
+.carb-dialog{width:min(560px,calc(100vw - 24px));max-height:calc(100vh - 24px);max-height:calc(100dvh - 24px);overflow-y:auto;margin:auto;padding:18px;border:1px solid var(--line);border-radius:8px;background:var(--field);color:var(--text)}
+.carb-dialog::backdrop{background:rgba(0,0,0,.55)}
+.carb-dialog h2{font-size:1.2rem;color:var(--ink);margin:0 0 4px}
+.carb-dialog p{overflow-wrap:anywhere}
+.carb-ingredient{border:1px solid var(--line);border-radius:6px;padding:12px;margin:12px 0}
+.carb-ingredient h3{font-size:1rem;margin:0 0 8px}
+.carb-ingredient label{display:block;margin:8px 0}
+.carb-ingredient label span{display:block;margin-bottom:3px}
+.carb-ingredient input{min-height:44px}
+.carb-ingredient .hint{display:block;margin:2px 0 0}
+.carb-ingredient .btn,.carb-dialog .btn{min-height:44px}
+.carb-total{font-size:1.1rem;font-weight:600;margin:14px 0 6px}
+.carb-preview{border:1px solid var(--line);border-radius:6px;padding:10px 12px;margin:10px 0}
+.carb-preview p{margin:3px 0}
+.carb-preview .btn{width:100%;margin-top:8px}
+.carb-dialog .sub{margin:5px 0}
 .weekly-checkin-card p:not(.sub){margin:10px 0 12px}
 .weekly-checkin-card .btn{min-height:44px}
 #v-day input,#v-day .scale button,#v-day .seg button,#v-day .chips button,#v-day .datebar .btn,#v-week input,#v-week select,#v-week .datebar .btn{min-height:44px}
@@ -296,13 +315,25 @@ td.num,th.num{text-align:right}
  </main>
 </div>
 <div id="status" role="status" aria-live="polite"></div>
+<dialog id="carbCalc" class="carb-dialog" aria-labelledby="carbCalcTitle" aria-describedby="carbCalcHelp">
+ <h2 id="carbCalcTitle">KH berechnen</h2>
+ <p id="carbCalcDate" class="sub"></p>
+ <p id="carbCalcHelp" class="sub">EU-Nährwertangabe: Ballaststoffe nicht zusätzlich abziehen.</p>
+ <div id="carbCalcRows"></div>
+ <button type="button" class="btn" id="carbCalcAdd">Zutat hinzufügen</button>
+ <p id="carbCalcTotal" class="carb-total"></p>
+ <p id="carbCalcRound" class="sub" hidden></p>
+ <div id="carbCalcPreview"></div>
+ <p id="carbCalcNotice" role="status" hidden></p>
+ <div class="btns"><button type="button" class="btn" id="carbCalcClose">Schließen</button></div>
+</dialog>
 <div id="print"></div>
 <input type="file" id="importFile" accept=".json,application/json" hidden>
 
 <script>
 const KEY='ketoProtokoll_v1';
 const RECOVERY_KEY='ketoProtokoll_recovery_v1';
-const VERSION='1.8.0'; // keep in sync with package.json, package-lock.json, and sw.js
+const VERSION='1.9.0'; // keep in sync with package.json, package-lock.json, and sw.js
 const SYMS=['Kopfschmerz','Müdigkeit','Muskelkrämpfe','Verdauung','Schwindel','Schlecht geschlafen','Heißhunger','Herzklopfen','Gereizt'];
 const DEFAULT_LABS=[['HbA1c','%'],['Glukose nüchtern','mg/dl'],['Gesamtcholesterin','mg/dl'],['LDL-Cholesterin','mg/dl'],['HDL-Cholesterin','mg/dl'],['Triglyzeride','mg/dl'],['Harnsäure','mg/dl'],['Kreatinin','mg/dl'],['eGFR','ml/min'],['GPT (ALT)','U/l'],['GOT (AST)','U/l'],['Gamma-GT','U/l'],['Natrium','mmol/l'],['Kalium','mmol/l'],['Magnesium','mmol/l'],['TSH','mU/l'],['CRP','mg/l']];
 const REFERENCES=[
@@ -763,7 +794,7 @@ function renderHead(){
 
 /* ---------- day ---------- */
 function numRow(f,label,hint,unit,d,mode='decimal',warn){
- return `<div class="row"><label for="f_${f}"><b>${label}</b><small>${hint}</small></label><div class="inp"><input id="f_${f}" data-f="${f}" type="text" inputmode="${mode}" autocomplete="off" value="${vv(d[f])}"><span class="unit">${unit}</span></div><small class="hint" id="hint_${f}"${warn?'':' hidden'}>${warn||''}</small></div>`}
+ return `<div class="row"><label for="f_${f}"><b>${label}</b><small>${hint}</small></label><div class="inp${f==='c'?' carb-entry':''}"><input id="f_${f}" data-f="${f}" type="text" inputmode="${mode}" autocomplete="off" value="${vv(d[f])}"><span class="unit">${unit}</span>${f==='c'?'<button type="button" class="btn" id="carbCalcOpen">KH berechnen</button>':''}</div><small class="hint" id="hint_${f}"${warn?'':' hidden'}>${warn||''}</small></div>`}
 function updateHint(field,d){
  const el=$('#hint_'+field);if(!el)return;
  const msg=plausMsg(field,d);
@@ -957,6 +988,164 @@ function renderDay(){
  }
  $('#v-day').innerHTML=h;
 }
+// Only a completed transfer changes S.days[date].c. Ingredient drafts stay in memory.
+let carbCalcRows=[],carbCalcNextId=0,carbCalcDate=null,carbCalcLauncher=null;
+let carbCalcPreviewCurrent=null,carbCalcTransferLock=false;
+const carbCalcDialog=$('#carbCalc');
+const carbCalcRow=()=>({id:++carbCalcNextId,name:'',amount:'',per100:''});
+function carbCalcNumber(raw,max){
+ const value=String(raw).trim();
+ if(value.length>40||!/^\d+(?:[.,]\d+)?$/.test(value))return null;
+ const grouped=value.match(/^(\d{1,3})[.,]\d{3}$/);
+ if(grouped&&Number(grouped[1])!==0)return null;
+ const number=Number(value.replace(',','.'));
+ return Number.isFinite(number)&&number<=max?number:null;
+}
+const carbCalcRound=value=>Math.round(value*10)/10;
+const carbCalcFixed=value=>value.toLocaleString('de-DE',{minimumFractionDigits:1,maximumFractionDigits:1});
+function carbCalcText(value){return value>0&&carbCalcRound(value)===0?'<0,1 g':`${carbCalcFixed(value)} g`}
+function carbCalcCurrent(date){
+ const value=S.days[date]?.c;
+ return value==null?null:typeof value==='number'&&Number.isFinite(value)&&value>=0?value:NaN;
+}
+function carbCalcRowResult(row){
+ const amount=carbCalcNumber(row.amount,10000),per100=carbCalcNumber(row.per100,100);
+ return {amount,per100,complete:amount!==null&&per100!==null,
+  portion:amount!==null&&per100!==null?amount*per100/100:0};
+}
+function carbCalcRenderRows(){
+ $('#carbCalcRows').innerHTML=carbCalcRows.map((row,index)=>`<section class="carb-ingredient" data-calc-row="${row.id}" aria-labelledby="carbRowTitle${row.id}">
+  <h3 id="carbRowTitle${row.id}">Zutat ${index+1}</h3>
+  <label for="carbName${row.id}"><span>Lebensmittel (optional)</span><input id="carbName${row.id}" data-calc-field="name" maxlength="80" autocomplete="off" value="${esc(row.name)}"></label>
+  <label for="carbAmount${row.id}"><span>Verzehrte Menge (g)</span><input id="carbAmount${row.id}" data-calc-field="amount" type="text" inputmode="decimal" maxlength="40" autocomplete="off" value="${esc(row.amount)}" aria-describedby="carbAmountError${row.id}"></label>
+  <small class="hint" id="carbAmountError${row.id}" hidden></small>
+  <label for="carbPer100${row.id}"><span>Kohlenhydrate laut Packung (g je 100 g)</span><input id="carbPer100${row.id}" data-calc-field="per100" type="text" inputmode="decimal" maxlength="40" autocomplete="off" value="${esc(row.per100)}" aria-describedby="carbPer100Error${row.id}"></label>
+  <small class="hint" id="carbPer100Error${row.id}" hidden></small>
+  <p>Diese Zutat: <output id="carbPortion${row.id}">–</output></p>
+  <button type="button" class="btn" data-calc-remove="${row.id}" aria-label="Zutat ${index+1}${row.name?' '+esc(row.name):''} entfernen">Zutat entfernen</button>
+ </section>`).join('');
+ carbCalcUpdate();
+}
+function carbCalcNotice(message){const el=$('#carbCalcNotice');el.textContent=message;el.hidden=!message}
+function carbCalcBudget(after,goal){
+ if(!validGoal(goal))return '<p>Eingestelltes Tageslimit: nicht verfügbar</p>';
+ const difference=goal-after;
+ const differenceText=difference!==0&&carbCalcRound(Math.abs(difference))===0?'&lt;0,1 g':`${carbCalcFixed(Math.abs(difference))} g`;
+ return `<p>Eingestelltes Tageslimit: ${carbCalcFixed(goal)} g</p><p>Danach: ${carbCalcFixed(after)} g</p>
+  <p>${difference>=0?`${differenceText} verbleibend`:`${differenceText} über dem eingestellten Limit`}</p>`;
+}
+function carbCalcUpdate(){
+ let total=0,complete=carbCalcRows.length>0;
+ carbCalcRows.forEach(row=>{
+  const result=carbCalcRowResult(row),section=$(`[data-calc-row="${row.id}"]`);
+  if(!result.complete)complete=false;
+  if(result.complete)total+=result.portion;
+  if(!section)return;
+  section.querySelector('output').textContent=result.complete?carbCalcText(result.portion):'–';
+  for(const [field,max,label] of [['amount',10000,'Menge'],['per100',100,'Kohlenhydrate je 100 g']]){
+   const error=section.querySelector(`#carb${field==='amount'?'Amount':'Per100'}Error${row.id}`);
+   const raw=row[field].trim();
+   error.textContent=raw&&carbCalcNumber(raw,max)===null?`${label}: Zahl von 0 bis ${max} eingeben.`:'';
+   error.hidden=!error.textContent;
+   section.querySelector(`[data-calc-field="${field}"]`).setAttribute('aria-invalid',String(!!error.textContent));
+  }
+ });
+ if(!Number.isFinite(total))complete=false;
+ const rounded=complete?carbCalcRound(total):null;
+ $('#carbCalcTotal').textContent=complete?`Mahlzeit gesamt: ${carbCalcText(total)}`:'Mahlzeit gesamt: – (alle Zeilen vervollständigen)';
+ const roundLine=$('#carbCalcRound');
+ roundLine.hidden=!(complete&&total>0&&rounded===0);
+ roundLine.textContent=roundLine.hidden?'':`Übertragungswert auf 0,1 g gerundet: 0,0 g`;
+ const current=carbCalcCurrent(carbCalcDate),goal=carbGoalOnDate(carbCalcDate);
+ carbCalcPreviewCurrent=current;
+ const invalidCurrent=Number.isNaN(current);
+ const dailyText=current===null?'Noch kein Tageswert eingetragen':invalidCurrent?'Tageswert nicht verfügbar':`Aktuell: ${carbCalcFixed(current)} g`;
+ let html=`<p>${dailyText}</p>`;
+ if(!complete||invalidCurrent){
+  if(invalidCurrent)html+='<p>Bitte den vorhandenen Tageswert vor der Übernahme korrigieren.</p>';
+  else html+=`<p>Eingestelltes Tageslimit: ${validGoal(goal)?`${carbCalcFixed(goal)} g`:'nicht verfügbar'}</p>`;
+ }else{
+  const action=(mode,after,description,label)=>`<div class="carb-preview"><p>${description}</p>
+   <p>Diese Mahlzeit: ${carbCalcText(total)}</p>${carbCalcBudget(after,goal)}
+   <button type="button" class="btn primary" data-calc-transfer="${mode}"${carbCalcTransferLock?' disabled':''}>${label}</button></div>`;
+  if(current===null)html+=action('take',rounded,`Tageswert: ${carbCalcFixed(rounded)} g`,'Als Tageswert übernehmen');
+  else{
+   const afterAdd=current+rounded;
+   html+=action('add',afterAdd,`${carbCalcFixed(current)} + ${carbCalcFixed(rounded)} = ${carbCalcFixed(afterAdd)} g`,'Zu Tageswert addieren');
+   html+=action('replace',rounded,`Tageswert ersetzen: ${carbCalcFixed(rounded)} g`,'Tageswert durch Mahlzeit ersetzen');
+  }
+ }
+ $('#carbCalcPreview').innerHTML=html;
+}
+function carbCalcOpen(button){
+ if(carbCalcDialog.open)return;
+ const input=$('#f_c');
+ if(input&&input.value.trim()&&num(input.value)===null){status('Bitte den Tageswert zuerst korrigieren');input.focus();return}
+ carbCalcDate=curDate;carbCalcLauncher=button;carbCalcTransferLock=false;
+ if(!carbCalcRows.length)carbCalcRows=[carbCalcRow()];
+ $('#carbCalcDate').textContent=`KH berechnen für ${fd(carbCalcDate,{day:'2-digit',month:'2-digit',year:'numeric'})}`;
+ carbCalcNotice('');carbCalcRenderRows();carbCalcDialog.showModal();
+ $('#carbCalcRows [data-calc-field="amount"]').focus();
+}
+function carbCalcTransfer(mode){
+ if(carbCalcTransferLock||!['take','add','replace'].includes(mode))return;
+ if(!carbCalcDialog.open||carbCalcDate!==curDate||$('#dpick')?.value!==carbCalcDate){
+  carbCalcNotice('Das ausgewählte Datum hat sich geändert. Bitte Rechner schließen und erneut öffnen.');return;
+ }
+ const current=carbCalcCurrent(carbCalcDate);
+ if(!Object.is(current,carbCalcPreviewCurrent)){
+  carbCalcUpdate();carbCalcNotice('Der Tageswert hat sich geändert. Bitte die neue Vorschau prüfen und erneut wählen.');return;
+ }
+ // Do not overwrite a newer localStorage write from another tab with stale S.
+ try{
+  if(localStorage.getItem(KEY)!==lastPersistedRaw){
+   carbCalcNotice('Browserdaten haben sich in einem anderen Tab geändert. Bitte Seite neu laden und Rechner erneut öffnen.');return;
+  }
+ }catch(e){carbCalcNotice('Tageswert konnte nicht geprüft werden. Bitte erneut versuchen.');return}
+ const results=carbCalcRows.map(carbCalcRowResult);
+ if(!results.length||results.some(result=>!result.complete))return;
+ const total=results.reduce((sum,result)=>sum+result.portion,0);
+ if(!Number.isFinite(total)||Number.isNaN(current)||mode==='take'&&current!==null||mode!=='take'&&current===null)return;
+ const meal=carbCalcRound(total);
+ const next=mode==='add'?current+meal:meal;
+ if(!Number.isFinite(next))return;
+ const input=$('#f_c');
+ if(!input)return;
+ carbCalcTransferLock=true;
+ input.value=String(next).replace('.',',');
+ input.dispatchEvent(new Event('change',{bubbles:true}));
+ let stored;
+ try{stored=JSON.parse(localStorage.getItem(KEY))?.days?.[carbCalcDate]?.c}catch(e){}
+ if(!Object.is(stored,next)){
+  carbCalcTransferLock=false;carbCalcUpdate();carbCalcNotice('Übernahme konnte nicht gespeichert werden. Bitte den Tageswert prüfen.');return;
+ }
+ carbCalcRows=[];carbCalcDialog.close();
+}
+$('#carbCalcAdd').addEventListener('click',()=>{
+ const row=carbCalcRow();carbCalcRows.push(row);carbCalcRenderRows();$(`#carbAmount${row.id}`).focus();
+});
+$('#carbCalcClose').addEventListener('click',()=>carbCalcDialog.close());
+$('#carbCalcRows').addEventListener('input',e=>{
+ const input=e.target,section=input.closest('[data-calc-row]'),row=carbCalcRows.find(item=>item.id===Number(section?.dataset.calcRow));
+ if(!row||!['name','amount','per100'].includes(input.dataset.calcField))return;
+ row[input.dataset.calcField]=input.dataset.calcField==='name'?input.value.slice(0,80):input.value;
+ if(input.dataset.calcField==='name')section.querySelector('[data-calc-remove]').setAttribute('aria-label',
+  `Zutat ${carbCalcRows.indexOf(row)+1}${row.name?' '+row.name:''} entfernen`);
+ carbCalcNotice('');carbCalcUpdate();
+});
+$('#carbCalcRows').addEventListener('click',e=>{
+ const button=e.target.closest('[data-calc-remove]');if(!button)return;
+ carbCalcRows=carbCalcRows.filter(row=>row.id!==Number(button.dataset.calcRemove));
+ carbCalcRenderRows();$('#carbCalcAdd').focus();
+});
+$('#carbCalcPreview').addEventListener('click',e=>{
+ const button=e.target.closest('[data-calc-transfer]');if(button)carbCalcTransfer(button.dataset.calcTransfer);
+});
+carbCalcDialog.addEventListener('close',()=>{
+ const launcher=carbCalcLauncher?.isConnected?carbCalcLauncher:$('#carbCalcOpen');
+ if(launcher)launcher.focus();
+ carbCalcDate=null;carbCalcLauncher=null;
+});
 const BP_READING_FIELDS=['sys1','dia1','sys2','dia2'];
 $('#v-day').addEventListener('change',e=>{
  const t=e.target;
@@ -991,6 +1180,7 @@ $('#v-day').addEventListener('click',e=>{
  const b=e.target.closest('button');if(!b)return;
  if(b.id==='backupWarnExp'){doExportBackup();renderDay();renderHead();return}
  if(b.id==='backupWarnDismiss'){S.settings.backupWarnDismissed=today();save();renderDay();return}
+ if(b.id==='carbCalcOpen'){carbCalcOpen(b);return}
  if(b.dataset.nav!=null){const n=+b.dataset.nav;curDate=n===0?today():addDays(curDate,n);renderDay();renderHead();return}
  if(b.dataset.openWeek!=null){curWeek=+b.dataset.openWeek;show('week');return}
  if(b.dataset.commitGoto){show(b.dataset.commitGoto);return}
