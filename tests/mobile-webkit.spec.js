@@ -184,6 +184,32 @@ test.describe('iPhone-sized WebKit smoke checks', () => {
     expect(await page.evaluate(() => S.days[today()].c)).toBe(28);
   });
 
+  test('GI guide uses readable cards with touchable controls and no page overflow', async ({ page }) => {
+    await gotoApp(page);
+    await seed(page, blankState());
+    await page.locator('#carbCalcOpen').tap();
+    await page.locator('#giGuideOpen').tap();
+    const guide = page.locator('#v-gi');
+    await expect(guide).toBeVisible();
+    await expect(guide.locator('.gi-head')).toBeHidden();
+    await expect(guide.locator('.gi-item')).toHaveCount(33);
+    for (const selector of ['#giSearch', '#giCategory', '#giSort', '[data-gi-level="Niedrig"]', '#giToCalc', '.gi-item summary']) {
+      const box = await guide.locator(selector).first().boundingBox();
+      expect(box.height, selector).toBeGreaterThanOrEqual(44);
+      expect(box.x, selector).toBeGreaterThanOrEqual(0);
+      expect(box.x + box.width, selector).toBeLessThanOrEqual(page.viewportSize().width + 1);
+    }
+    const card = guide.locator('.gi-item').first();
+    await expect(card.locator('.gi-value')).toBeVisible();
+    await expect(card.locator('.gi-class')).toBeVisible();
+    await card.locator('summary').tap();
+    await expect(card.locator('details')).toHaveAttribute('open', '');
+    expect(await page.evaluate(() => document.documentElement.scrollWidth - document.documentElement.clientWidth)).toBeLessThanOrEqual(2);
+    await guide.locator('#giSearch').fill('Hafer');
+    await expect(guide.locator('.gi-item')).toHaveCount(2);
+    expect(await page.evaluate(() => document.documentElement.scrollWidth - document.documentElement.clientWidth)).toBeLessThanOrEqual(2);
+  });
+
   test('commitment progress and long local text fit the phone without crowding measurements', async ({ page }) => {
     await gotoApp(page);
     await seed(page, blankState({ settings: { ...blankState().settings, commitment: {
