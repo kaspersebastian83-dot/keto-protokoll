@@ -158,6 +158,32 @@ test.describe('iPhone-sized WebKit smoke checks', () => {
     expect(await page.evaluate(() => document.documentElement.scrollWidth - document.documentElement.clientWidth)).toBeLessThanOrEqual(2);
   });
 
+  test('carb dialog stacks ingredients, scrolls on a short phone viewport, and keeps actions reachable', async ({ page }) => {
+    await gotoApp(page);
+    await seed(page, blankState({ days: { [today()]: { c: 18 } } }));
+    await page.setViewportSize({ width: 390, height: 500 });
+    await page.locator('#carbCalcOpen').tap();
+    await expect(page.locator('#carbCalc')).toBeVisible();
+    const amount = page.locator('[data-calc-field="amount"]');
+    await expect(amount).toBeFocused();
+    await amount.fill('100');
+    await page.locator('[data-calc-field="per100"]').fill('8');
+    await page.locator('#carbCalcAdd').tap();
+    await page.locator('[data-calc-row]').nth(1).locator('[data-calc-field="amount"]').fill('50');
+    await page.locator('[data-calc-row]').nth(1).locator('[data-calc-field="per100"]').fill('4');
+    const box = await page.locator('#carbCalc').boundingBox();
+    expect(box.x).toBeGreaterThanOrEqual(0);
+    expect(box.x + box.width).toBeLessThanOrEqual(391);
+    expect(box.height).toBeLessThanOrEqual(500);
+    for (const selector of ['#carbCalcAdd', '#carbCalcClose', '[data-calc-remove]', '[data-calc-transfer="add"]', '[data-calc-transfer="replace"]']) {
+      const button = page.locator(selector).first();
+      expect((await button.boundingBox()).height, selector).toBeGreaterThanOrEqual(44);
+    }
+    expect(await page.evaluate(() => document.documentElement.scrollWidth - document.documentElement.clientWidth)).toBeLessThanOrEqual(2);
+    await page.locator('[data-calc-transfer="add"]').tap();
+    expect(await page.evaluate(() => S.days[today()].c)).toBe(28);
+  });
+
   test('commitment progress and long local text fit the phone without crowding measurements', async ({ page }) => {
     await gotoApp(page);
     await seed(page, blankState({ settings: { ...blankState().settings, commitment: {
