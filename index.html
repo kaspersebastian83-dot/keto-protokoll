@@ -98,6 +98,20 @@ textarea{min-height:64px;resize:vertical}
 .carb-preview p{margin:3px 0}
 .carb-preview .btn{width:100%;margin-top:8px}
 .carb-dialog .sub{margin:5px 0}
+.lab-import-dialog{width:min(720px,calc(100vw - 24px));max-height:calc(100dvh - 24px);overflow-y:auto;margin:auto;padding:18px;border:1px solid var(--line);border-radius:8px;background:var(--field);color:var(--text)}
+.lab-import-dialog::backdrop{background:rgba(0,0,0,.55)}
+.lab-import-dialog h2{font-size:1.2rem;color:var(--ink);margin:0 0 4px}
+.lab-import-dialog label{display:block;margin:12px 0 4px}
+.lab-import-dialog input[type="date"],.lab-import-dialog textarea,.lab-import-dialog .btn{min-height:44px}
+.lab-import-dialog textarea{min-height:150px;resize:vertical}
+.lab-import-dialog .btns{position:sticky;bottom:-18px;background:var(--field);padding:10px 0 18px}
+.lab-import-preview-scroll{max-width:100%;overflow-x:auto;overscroll-behavior-x:contain;-webkit-overflow-scrolling:touch}
+.lab-import-preview-scroll table{min-width:680px}
+.lab-import-preview-scroll td{vertical-align:top;overflow-wrap:anywhere;word-break:break-word}
+.lab-import-preview-scroll td:first-child{min-width:130px}
+.lab-import-dialog .lab-import-confirm{display:flex;align-items:flex-start;gap:10px;min-height:44px;cursor:pointer}
+.lab-import-confirm input{width:22px;height:22px;flex:none;margin-top:2px}
+.lab-import-dialog .sub,.lab-import-dialog #labImportStatus{overflow-wrap:anywhere}
 .gi-intro strong{display:block;margin:10px 0;color:var(--ink)}
 .gi-actions{display:flex;flex-wrap:wrap;gap:8px;margin:0 0 16px}
 .gi-actions .btn{min-height:44px}
@@ -292,6 +306,8 @@ td.num,th.num{text-align:right}
 .report h2{font-family:Georgia,"Times New Roman",serif;font-weight:500;font-size:13.5pt;color:var(--ink);margin:9mm 0 3mm;padding-left:3mm;border-left:2.6pt solid var(--ink);break-after:avoid;break-inside:avoid}
 .report h2:first-of-type{margin-top:0}
 .report h2+*{break-inside:avoid}
+.report h2+.lab-report-table{break-inside:auto}
+.report .lab-report-table thead{display:table-header-group}
 .report table{font-size:9.5pt}
 .report table.data td{padding:1.9mm 2.5mm;border-bottom:.4pt solid var(--hair)}
 .report table.data th{border-bottom:1pt solid var(--ink)}
@@ -358,13 +374,23 @@ td.num,th.num{text-align:right}
  <p id="carbCalcNotice" role="status" hidden></p>
  <div class="btns"><button type="button" class="btn" id="carbCalcClose">Schließen</button></div>
 </dialog>
+<dialog id="labImport" class="lab-import-dialog" aria-labelledby="labImportTitle" aria-describedby="labImportHelp">
+ <h2 id="labImportTitle">Laborbefund einfügen</h2>
+ <p id="labImportHelp" class="sub">Ausgangswerte aus vier Tab-Spalten einfügen: Parameter, Wert, Einheit, Referenzbereich. Die Prüfung erfolgt nur in diesem Browser.</p>
+ <label for="labImportDate">Labor-Datum</label><input id="labImportDate" type="date" required>
+ <label for="labImportText">Laborwerte einfügen</label><textarea id="labImportText" spellcheck="false" autocomplete="off" placeholder="Parameter&#9;Wert&#9;Einheit&#9;Referenzbereich"></textarea>
+ <div class="btns"><button type="button" class="btn" id="labImportCheck">Prüfen</button></div>
+ <p id="labImportStatus" role="status" aria-live="polite"></p>
+ <div id="labImportPreview"></div>
+ <div class="btns"><button type="button" class="btn primary" id="labImportApply" disabled>Als Ausgangswerte übernehmen</button><button type="button" class="btn" id="labImportClose">Schließen</button></div>
+</dialog>
 <div id="print"></div>
 <input type="file" id="importFile" accept=".json,application/json" hidden>
 
 <script>
 const KEY='ketoProtokoll_v1';
 const RECOVERY_KEY='ketoProtokoll_recovery_v1';
-const VERSION='1.10.0'; // keep in sync with package.json, package-lock.json, and sw.js
+const VERSION='1.10.1'; // keep in sync with package.json, package-lock.json, and sw.js
 const SYMS=['Kopfschmerz','Müdigkeit','Muskelkrämpfe','Verdauung','Schwindel','Schlecht geschlafen','Heißhunger','Herzklopfen','Gereizt'];
 const DEFAULT_LABS=[['HbA1c','%'],['Glukose nüchtern','mg/dl'],['Gesamtcholesterin','mg/dl'],['LDL-Cholesterin','mg/dl'],['HDL-Cholesterin','mg/dl'],['Triglyzeride','mg/dl'],['Harnsäure','mg/dl'],['Kreatinin','mg/dl'],['eGFR','ml/min'],['GPT (ALT)','U/l'],['GOT (AST)','U/l'],['Gamma-GT','U/l'],['Natrium','mmol/l'],['Kalium','mmol/l'],['Magnesium','mmol/l'],['TSH','mU/l'],['CRP','mg/l']];
 const REFERENCES=[
@@ -1388,20 +1414,28 @@ $('#v-week').addEventListener('click',e=>{const b=e.target.closest('[data-wnav]'
 
 /* ---------- lab ---------- */
 function delta(a,b,d=1){const x=num(a),y=num(b);if(x==null||y==null)return '';const dv=y-x;if(dv===0)return '±0';return `<span class="${dv>0?'up':'down'}">${dv>0?'+':'−'}${fmt(Math.abs(dv),d)}</span>`}
+const LAB_NUMBER_PATTERN='[+-]?(?:\\d+(?:[.,]\\d+)?|[.,]\\d+)';
+function strictLabNumber(raw){
+ const value=String(raw??'').trim();
+ if(value.length>40||!new RegExp(`^${LAB_NUMBER_PATTERN}$`).test(value))return null;
+ if(/^[+-]?[1-9]\d{0,2}[.,]\d{3}$/.test(value))return null;
+ const number=Number(value.replace(',','.'));
+ return Number.isFinite(number)?number:null;
+}
 function parseRange(str){
  const s=String(str||'').trim();
- let m=s.match(/^<\s*([\d.,]+)$/);
- if(m){const v=num(m[1]);return v==null?{min:null,max:null}:{min:null,max:v}}
- m=s.match(/^>\s*([\d.,]+)$/);
- if(m){const v=num(m[1]);return v==null?{min:null,max:null}:{min:v,max:null}}
- m=s.match(/^([\d.,]+)\s*-\s*([\d.,]+)$/);
- if(m){const lo=num(m[1]),hi=num(m[2]);return (lo==null||hi==null)?{min:null,max:null}:{min:lo,max:hi}}
+ let m=s.match(new RegExp(`^(<=|>=|<|>)\\s*(${LAB_NUMBER_PATTERN})$`));
+ if(m){const v=strictLabNumber(m[2]);return v==null?{min:null,max:null}:m[1].startsWith('<')?{min:null,max:v}:{min:v,max:null}}
+ m=s.match(new RegExp(`^(${LAB_NUMBER_PATTERN})\\s*-\\s*(${LAB_NUMBER_PATTERN})$`));
+ if(m){const lo=strictLabNumber(m[1]),hi=strictLabNumber(m[2]);return (lo==null||hi==null||lo>hi)?{min:null,max:null}:{min:lo,max:hi}}
  return {min:null,max:null};
 }
 function isOutOfRange(value,range){
- if(value==null)return false;
+ if(value==null||!Number.isFinite(value))return false;
  const {min,max}=parseRange(range);
- return (min!=null&&value<min)||(max!=null&&value>max);
+ const operator=String(range||'').trim().match(/^(<=|>=|<|>)/)?.[1];
+ return (min!=null&&(value<min||operator==='>'&&value===min))||
+  (max!=null&&(value>max||operator==='<'&&value===max));
 }
 function renderLab(){
  const L=S.labs;
@@ -1409,10 +1443,11 @@ function renderLab(){
  const anyOOR=L.some(r=>isOutOfRange(num(r.base),r.range)||isOutOfRange(num(r.end),r.range));
  $('#v-lab').innerHTML=`<div class="panel"><h2>Laborwerte</h2><p class="sub">Aus dem Befund übertragen, Einheiten wie im Befund. Eigene Werte kannst du unten ergänzen.</p>
  <div class="row"><label for="lb_base"><b>Ausgangswert vom</b></label><input id="lb_base" type="date" data-ld="base" value="${S.labDates.base||''}"></div>
- <div class="row"><label for="lb_end"><b>Abschlusswert vom</b></label><input id="lb_end" type="date" data-ld="end" value="${S.labDates.end||''}"></div></div>
+ <div class="row"><label for="lb_end"><b>Abschlusswert vom</b></label><input id="lb_end" type="date" data-ld="end" value="${S.labDates.end||''}"></div>
+ <div class="btns"><button type="button" class="btn" id="labImportOpen">Laborbefund einfügen</button></div></div>
  <div class="panel scroll"><table class="labtbl"><thead><tr><th>Parameter</th><th>Einheit</th><th>Normbereich</th><th class="num">Ausgang</th><th class="num">Abschluss</th><th class="num">Δ</th><th></th></tr></thead><tbody>
  ${L.map((r,i)=>`<tr><td><input data-li="${i}" data-lk="name" value="${esc(r.name)}" aria-label="Parameter"></td><td style="width:90px"><input data-li="${i}" data-lk="unit" value="${esc(r.unit)}" aria-label="Einheit"></td><td style="width:90px"><input data-li="${i}" data-lk="range" value="${esc(r.range)}" aria-label="${esc(r.name)} Normbereich" placeholder="z.B. 70-99"></td><td style="width:90px">${oorCell('Ausgang','base',r,i)}</td><td style="width:90px">${oorCell('Abschluss','end',r,i)}</td><td class="num" style="width:60px">${delta(r.base,r.end,2)}</td><td style="width:36px"><button type="button" class="btn" data-ldel="${i}" aria-label="${esc(r.name)} entfernen" style="padding:4px 8px">✕</button></td></tr>`).join('')}
- </tbody></table>${anyOOR?'<p class="small" style="margin-top:6px">* außerhalb des angegebenen Normbereichs</p>':''}<div class="btns"><button type="button" class="btn" id="labAdd">Parameter hinzufügen</button></div></div>`;
+ </tbody></table>${anyOOR?'<p class="small" style="margin-top:6px">* außerhalb des angegebenen Labor-Referenzbereichs</p>':''}<div class="btns"><button type="button" class="btn" id="labAdd">Parameter hinzufügen</button></div></div>`;
 }
 $('#v-lab').addEventListener('change',e=>{
  const t=e.target;
@@ -1423,6 +1458,130 @@ $('#v-lab').addEventListener('click',e=>{
  const b=e.target.closest('button');if(!b)return;
  if(b.id==='labAdd'){S.labs.push({name:'',unit:'',range:'',base:'',end:''});save();renderLab();const ins=document.querySelectorAll('#v-lab input[data-lk="name"]');ins[ins.length-1].focus()}
  else if(b.dataset.ldel!=null){const r=S.labs[+b.dataset.ldel];if((r.base||r.end)&&!confirm(`„${r.name}" mit eingetragenen Werten entfernen?`))return;S.labs.splice(+b.dataset.ldel,1);save('Entfernt');renderLab()}
+ else if(b.id==='labImportOpen')openLabImport(b);
+});
+
+const LAB_IMPORT_LIMITS={rows:100,characters:30000,name:120,unit:40,range:120};
+const LAB_ALIASES={
+ 'glucose':'glukose nüchtern','glukose':'glukose nüchtern','glukose nüchtern':'glukose nüchtern',
+ 'gpt':'gpt (alt)','alt':'gpt (alt)','gpt (alt)':'gpt (alt)',
+ 'got':'got (ast)','ast':'got (ast)','got (ast)':'got (ast)',
+ 'gamma-gt':'gamma-gt','ggt':'gamma-gt','γ-gt':'gamma-gt',
+ 'ldl':'ldl-cholesterin','ldl-cholesterin':'ldl-cholesterin',
+ 'hdl':'hdl-cholesterin','hdl-cholesterin':'hdl-cholesterin',
+ 'tsh':'tsh','tsh (basal)':'tsh','kreatinin':'kreatinin','creatinin':'kreatinin'
+};
+const labImportNameKey=name=>String(name??'').trim().replace(/\s+/g,' ').toLocaleLowerCase('de-DE');
+const labImportTargetKey=name=>{const key=labImportNameKey(name);return Object.prototype.hasOwnProperty.call(LAB_ALIASES,key)?LAB_ALIASES[key]:key};
+const labHasValue=value=>value!=null&&String(value).trim()!=='';
+const labSnapshot=()=>JSON.stringify({labs:S.labs,labDates:S.labDates});
+const labImportDialog=$('#labImport');
+let labImportLauncher=null,labImportPreview=null,labImportBusy=false;
+function labImportStatus(message){$('#labImportStatus').textContent=message}
+function clearLabImportDraft(){
+ $('#labImportDate').value='';$('#labImportText').value='';
+ $('#labImportPreview').replaceChildren();$('#labImportApply').disabled=true;
+ labImportPreview=null;labImportBusy=false;labImportStatus('');
+}
+function openLabImport(button){
+ if(labImportDialog.open)return;
+ clearLabImportDraft();labImportLauncher=button;
+ labImportDialog.showModal();$('#labImportDate').focus();
+}
+function parseLabImport(text){
+ const lines=text.split(/\r?\n/).filter(line=>line.trim()!=='');
+ const header=['parameter','wert','einheit','referenzbereich'];
+ if(lines.length&&lines[0].split('\t').map(labImportNameKey).join('|')===header.join('|'))lines.shift();
+ if(lines.length>LAB_IMPORT_LIMITS.rows)return {error:`Höchstens ${LAB_IMPORT_LIMITS.rows} Zeilen einfügen.`};
+ const destinations=new Map();
+ S.labs.forEach((row,index)=>{
+  const key=labImportTargetKey(row.name);
+  if(!destinations.has(key))destinations.set(key,[]);
+  destinations.get(key).push(index);
+ });
+ const rows=lines.map((line,index)=>{
+  const fields=line.split('\t'),name=(fields[0]||'').trim(),value=(fields[1]||'').trim(),unit=(fields[2]||'').trim(),range=fields[3]??'';
+  const key=labImportTargetKey(name),matches=destinations.get(key)||[],issues=[];
+  if(fields.length!==4)issues.push('genau vier Tab-Spalten erforderlich');
+  if(!name)issues.push('Parameter fehlt');
+  if(name.length>LAB_IMPORT_LIMITS.name)issues.push(`Parameter länger als ${LAB_IMPORT_LIMITS.name} Zeichen`);
+  if(unit.length>LAB_IMPORT_LIMITS.unit)issues.push(`Einheit länger als ${LAB_IMPORT_LIMITS.unit} Zeichen`);
+  if(range.length>LAB_IMPORT_LIMITS.range)issues.push(`Referenzbereich länger als ${LAB_IMPORT_LIMITS.range} Zeichen`);
+  if(!value)issues.push('Wert fehlt');
+  else if(strictLabNumber(value)===null)issues.push('ungültiger oder mehrdeutiger Wert');
+  if(matches.length>1)issues.push('mehrdeutig: mehrere bestehende Parameter');
+  const destination=matches.length===1?matches[0]:null;
+  if(destination!==null&&labHasValue(S.labs[destination].end)&&
+     (String(S.labs[destination].unit??'').trim()!==unit||String(S.labs[destination].range??'').trim()!==range.trim()))
+   issues.push('Abschlusswert vorhanden; Einheit oder Referenzbereich weicht ab. Bitte manuell prüfen.');
+  return {line:index+1,name,value,unit,range,key,destination,issues};
+ });
+ const seen=new Map();
+ rows.forEach(row=>{if(row.key){if(!seen.has(row.key))seen.set(row.key,[]);seen.get(row.key).push(row)}});
+ seen.forEach(group=>{if(group.length>1)group.forEach(row=>row.issues.push('Konflikt: Parameter mehrfach im Befund'))});
+ return {rows};
+}
+function renderLabImportPreview(parsed,date){
+ const container=$('#labImportPreview');
+ const rows=parsed.rows||[];
+ const importedIndices=new Set(rows.filter(row=>!row.issues.length&&row.destination!==null).map(row=>row.destination));
+ const oldIndices=S.labs.flatMap((row,index)=>labHasValue(row.base)?[index]:[]);
+ const removed=oldIndices.filter(index=>!importedIndices.has(index));
+ const invalid=rows.filter(row=>row.issues.length).length;
+ const validDate=validISODate(date);
+ const errors=[!validDate?'Ein gültiges Labor-Datum eingeben.':'',!rows.length?'Mindestens eine Laborzeile einfügen.':'',invalid?`${invalid} Zeile${invalid===1?'':'n'} mit Fehlern oder Konflikten.`:''].filter(Boolean);
+ labImportStatus(errors.length?errors.join(' '):`${rows.length} Zeilen geprüft. ${oldIndices.length?`${oldIndices.length} vorhandene Ausgangswerte werden ersetzt. ${removed.length} fehlen im neuen Befund und werden entfernt.`:'Bereit zur Übernahme.'}`);
+ const displayRow=row=>{
+  const existing=row.destination!==null?S.labs[row.destination]:null;
+  const status=row.issues.length?row.issues.join('; '):existing?labHasValue(existing.base)?'bestehender Parameter; wird vorhandenen Ausgangswert ersetzen':'bestehender Parameter':'neuer Parameter';
+  return `<tr><td>${esc(row.name)||'–'}</td><td>${esc(row.value)||'–'}</td><td>${esc(row.unit)||'–'}</td><td>${esc(row.range)||'–'}</td><td>${existing?esc(existing.name):'neuer Parameter'}</td><td>${existing?esc(existing.base)||'–':'–'}</td><td>${esc(status)}</td></tr>`;
+ };
+ const cleared=removed.map(index=>{const row=S.labs[index];return `<tr><td>${esc(row.name)}</td><td>–</td><td>${esc(row.unit)||'–'}</td><td>${esc(row.range)||'–'}</td><td>${esc(row.name)}</td><td>${esc(row.base)}</td><td>wird beim Ersetzen entfernt</td></tr>`}).join('');
+ container.innerHTML=`<div class="lab-import-preview-scroll" role="region" tabindex="0" aria-label="Vorschau der Laborwerte, seitlich verschiebbar"><table><thead><tr><th>Parameter</th><th>Wert</th><th>Einheit</th><th>Referenzbereich</th><th>Ziel</th><th>Bisheriger Ausgangswert</th><th>Status</th></tr></thead><tbody>${rows.map(displayRow).join('')}${cleared}</tbody></table></div>
+ ${oldIndices.length?`<label class="lab-import-confirm"><input type="checkbox" id="labImportReplace"><span>Ich bestätige: ${oldIndices.length} vorhandene Ausgangswerte werden ersetzt; ${removed.length} davon fehlen im neuen Befund und werden entfernt.</span></label>`:''}`;
+ return {ready:validDate&&rows.length>0&&invalid===0,hasExisting:oldIndices.length>0,removed:removed.length};
+}
+function updateLabImportApply(){
+ $('#labImportApply').disabled=labImportBusy||!labImportPreview?.ready||
+  labImportPreview.hasExisting&&!$('#labImportReplace')?.checked;
+}
+$('#labImportCheck').addEventListener('click',()=>{
+ const raw=$('#labImportText').value,date=$('#labImportDate').value;
+ if(raw.length>LAB_IMPORT_LIMITS.characters){labImportPreview=null;$('#labImportPreview').replaceChildren();labImportStatus(`Höchstens ${LAB_IMPORT_LIMITS.characters} Zeichen einfügen.`);updateLabImportApply();return}
+ const parsed=parseLabImport(raw),result=parsed.error?null:renderLabImportPreview(parsed,date);
+ if(parsed.error){labImportPreview=null;$('#labImportPreview').replaceChildren();labImportStatus(parsed.error)}
+ else labImportPreview={...result,rows:parsed.rows,date,raw,labSnapshot:labSnapshot(),storageRaw:lastPersistedRaw};
+ updateLabImportApply();
+});
+for(const id of ['labImportDate','labImportText'])$('#'+id).addEventListener('input',()=>{
+ if(!labImportPreview)return;
+ labImportPreview=null;$('#labImportPreview').replaceChildren();labImportStatus('Eingabe geändert. Bitte erneut prüfen.');updateLabImportApply();
+});
+$('#labImportPreview').addEventListener('change',e=>{if(e.target.id==='labImportReplace')updateLabImportApply()});
+$('#labImportClose').addEventListener('click',()=>labImportDialog.close());
+labImportDialog.addEventListener('close',()=>{
+ clearLabImportDraft();
+ const launcher=labImportLauncher?.isConnected?labImportLauncher:$('#labImportOpen');
+ if(launcher)launcher.focus();
+ labImportLauncher=null;
+});
+$('#labImportApply').addEventListener('click',()=>{
+ const preview=labImportPreview;
+ if(labImportBusy||!preview?.ready||preview.hasExisting&&!$('#labImportReplace')?.checked)return;
+ if($('#labImportDate').value!==preview.date||$('#labImportText').value!==preview.raw||
+    labSnapshot()!==preview.labSnapshot){labImportStatus('Laborwerte haben sich geändert. Bitte erneut prüfen.');labImportPreview=null;updateLabImportApply();return}
+ try{if(localStorage.getItem(KEY)!==preview.storageRaw){labImportStatus('Browserdaten haben sich geändert. Bitte Seite neu laden und erneut prüfen.');return}}
+ catch(e){labImportStatus('Browserdaten konnten nicht geprüft werden. Bitte erneut versuchen.');return}
+ labImportBusy=true;updateLabImportApply();
+ const next=JSON.parse(JSON.stringify(S));
+ next.labs.forEach(row=>{row.base=''});
+ preview.rows.forEach(row=>{
+  if(row.destination===null)next.labs.push({name:row.name,unit:row.unit,range:row.range,base:row.value,end:''});
+  else Object.assign(next.labs[row.destination],{unit:row.unit,range:row.range,base:row.value});
+ });
+ next.labDates.base=preview.date;
+ if(!persistState(next)){labImportBusy=false;updateLabImportApply();labImportStatus('Speichern fehlgeschlagen. Die bisherigen Laborwerte bleiben erhalten.');return}
+ S=next;labImportDialog.close();renderLab();status('Ausgangswerte übernommen');
 });
 
 /* ---------- charts ---------- */
@@ -1965,7 +2124,7 @@ function reportHTML(){
  <p>Blutdruck an ${bpTwo} Tagen mit zwei Messungen erfasst, an ${bpOne} Tagen mit einer.</p>
  <h2>Kurven</h2><div class="cg">${charts.join('')}</div>
  <h2>Laborwerte</h2>
- ${labs.length?`<table class="data"><thead><tr><th>Parameter</th><th>Einheit</th><th>Normbereich</th><th class="num">Ausgang${S.labDates.base?'<br><span class="small">'+fd(S.labDates.base,{day:'2-digit',month:'2-digit',year:'numeric'})+'</span>':''}</th><th class="num">Abschluss${S.labDates.end?'<br><span class="small">'+fd(S.labDates.end,{day:'2-digit',month:'2-digit',year:'numeric'})+'</span>':''}</th><th class="num">Veränderung</th></tr></thead><tbody>${labs.map(r=>`<tr><td>${esc(r.name)}</td><td>${esc(r.unit)}</td><td>${esc(r.range)||'–'}</td><td class="num">${esc(r.base)||'–'}${isOutOfRange(num(r.base),r.range)?'<sup>*</sup>':''}</td><td class="num">${esc(r.end)||'–'}${isOutOfRange(num(r.end),r.range)?'<sup>*</sup>':''}</td><td class="num">${delta(r.base,r.end,2).replace(/<[^>]+>/g,'')}</td></tr>`).join('')}</tbody></table>${labs.some(r=>isOutOfRange(num(r.base),r.range)||isOutOfRange(num(r.end),r.range))?'<p class="small">* außerhalb des angegebenen Normbereichs</p>':''}`:'<p>Keine Laborwerte eingetragen.</p>'}
+ ${labs.length?`<table class="data lab-report-table"><thead><tr><th>Parameter</th><th>Einheit</th><th>Normbereich</th><th class="num">Ausgang${S.labDates.base?'<br><span class="small">'+fd(S.labDates.base,{day:'2-digit',month:'2-digit',year:'numeric'})+'</span>':''}</th><th class="num">Abschluss${S.labDates.end?'<br><span class="small">'+fd(S.labDates.end,{day:'2-digit',month:'2-digit',year:'numeric'})+'</span>':''}</th><th class="num">Veränderung</th></tr></thead><tbody>${labs.map(r=>`<tr><td>${esc(r.name)}</td><td>${esc(r.unit)}</td><td>${esc(r.range)||'–'}</td><td class="num">${esc(r.base)||'–'}${isOutOfRange(num(r.base),r.range)?'<sup>*</sup>':''}</td><td class="num">${esc(r.end)||'–'}${isOutOfRange(num(r.end),r.range)?'<sup>*</sup>':''}</td><td class="num">${delta(r.base,r.end,2).replace(/<[^>]+>/g,'')}</td></tr>`).join('')}</tbody></table>${labs.some(r=>isOutOfRange(num(r.base),r.range)||isOutOfRange(num(r.end),r.range))?'<p class="small">* außerhalb des angegebenen Labor-Referenzbereichs</p>':''}`:'<p>Keine Laborwerte eingetragen.</p>'}
  ${meds.length?`<h2>Medikation</h2>
  <table class="data"><thead><tr><th>Name</th><th>Letzte Dosis</th><th>Kategorie</th><th class="num">Einnahme (gesamter Zeitraum)</th></tr></thead><tbody>${meds.map(m=>{const {taken,logged}=medAdherence(st.start,end,m),period=medPeriodText(m),lastDate=m.stoppedAt&&m.stoppedAt<=end?addDays(m.stoppedAt,-1):end;return `<tr><td>${esc(m.name)}${period?`<br><span class="small">${esc(period)}</span>`:''}</td><td>${esc(medDoseOnDate(m,lastDate))}</td><td>${esc(m.category)}</td><td class="num">${logged?fmt(taken/logged*100,0)+' %':'–'} <span class="small">(${logged} Tage erfasst)</span></td></tr>`}).join('')}</tbody></table>
  ${validDoseChanges.length?`<p class="small" style="margin-top:2mm">Dosisänderungen</p><table class="data"><thead><tr><th>Datum</th><th>Medikament</th><th>Alte Dosis</th><th>Neue Dosis</th></tr></thead><tbody>${[...validDoseChanges].sort((a,b)=>a.date<b.date?-1:a.date>b.date?1:0).map(c=>{const m=st.meds.find(x=>x.id===c.medId);return `<tr><td>${fd(c.date)}</td><td>${esc(m.name)}</td><td>${esc(c.oldDose)||'–'}</td><td>${esc(c.newDose)}</td></tr>`}).join('')}</tbody></table>`:''}`:''}

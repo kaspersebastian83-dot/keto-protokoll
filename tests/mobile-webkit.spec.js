@@ -58,6 +58,31 @@ test.describe('iPhone-sized WebKit smoke checks', () => {
     await expect(page.locator('#importFile')).toBeHidden();
   });
 
+  test('lab importer dialog and preview stay usable on a short phone viewport', async ({ page }) => {
+    await gotoApp(page);
+    await seed(page, blankState());
+    await page.setViewportSize({ width: 390, height: 500 });
+    await page.locator('nav button[data-tab="lab"]').tap();
+    await page.locator('#labImportOpen').tap();
+    await expect(page.locator('#labImportDate')).toBeFocused();
+    await page.locator('#labImportDate').fill('2026-09-01');
+    await page.locator('#labImportText').fill('Long synthetic laboratory parameter name\t12,3\tU/l\t< 20');
+    await page.locator('#labImportCheck').tap();
+    await expect(page.locator('#labImportPreview tbody tr')).toHaveCount(1);
+    const box = await page.locator('#labImport').boundingBox();
+    expect(box.x).toBeGreaterThanOrEqual(0);
+    expect(box.x + box.width).toBeLessThanOrEqual(391);
+    expect(box.height).toBeLessThanOrEqual(500);
+    for (const selector of ['#labImportDate', '#labImportText', '#labImportCheck', '#labImportApply', '#labImportClose'])
+      expect((await page.locator(selector).boundingBox()).height, selector).toBeGreaterThanOrEqual(44);
+    const preview = page.locator('.lab-import-preview-scroll');
+    expect(await preview.evaluate(el => el.scrollWidth)).toBeGreaterThan(await preview.evaluate(el => el.clientWidth));
+    expect(await page.evaluate(() => document.documentElement.scrollWidth - document.documentElement.clientWidth)).toBeLessThanOrEqual(2);
+    await page.locator('#labImportApply').tap();
+    await expect(page.locator('#labImport')).toBeHidden();
+    expect(await page.evaluate(() => S.labs[0].base)).toBe('12,3');
+  });
+
   test('a synthetic backup imports and its previous live state restores through touch UI', async ({ page }) => {
     await gotoApp(page);
     const live = blankState({

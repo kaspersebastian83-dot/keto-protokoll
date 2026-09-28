@@ -323,6 +323,10 @@ The local calculator uses EU-label carbohydrates per 100 g to total multiple ing
 
 The bundled, offline GI guide contains a small curated set of sourced review means and identified tested products. It supports local search and filters and is reachable from the carb calculator. GI describes carbohydrate quality, not carbohydrate quantity or keto suitability. The guide does not change user data, reports, exports, or the calculator.
 
+#### P4.5.1 — Laboratory baseline import — COMPLETE
+
+The Labor view accepts a locally pasted, four-column tab-separated panel. It previews deterministic parameter matches and new rows before confirmation, then replaces the current baseline panel while retaining follow-up values. Parsing stays in the browser; no report text or laboratory values are bundled with the app.
+
 #### P4.6 — Two-variable comparison UX — PLANNED
 
 Potential goals include improving the existing Wert A / Wert B workflow, selected-variable context, axis and unit labels, mobile presentation, and empty or insufficient-data states. Correlation coefficients, significance testing, and causal interpretation are out of scope; they would require a separately defined evidence/statistics phase.
