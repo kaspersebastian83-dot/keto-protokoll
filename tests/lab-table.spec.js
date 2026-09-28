@@ -38,6 +38,25 @@ test.describe('Lab table', () => {
     expect(r.unparseable).toBe(false);
   });
 
+  test('manual values and doctor report respect strict and inclusive lab-reference boundaries', async ({ page }) => {
+    await gotoApp(page);
+    await seed(page, blankState({
+      labs: [
+        { name: 'Strict synthetic', unit: 'U/l', range: '< 20', base: '20', end: '' },
+        { name: 'Inclusive synthetic', unit: 'U/l', range: '<= 20', base: '20', end: '' },
+      ],
+    }));
+    await page.click('nav button[data-tab="lab"]');
+    await expect(page.locator('.labtbl input.oor')).toHaveCount(1);
+    const report = await page.evaluate(() => reportHTML());
+    const doc = await page.evaluate(html => {
+      const parsed = new DOMParser().parseFromString(html, 'text/html');
+      return [...parsed.querySelectorAll('.lab-report-table tbody tr')].map(tr => ({ name: tr.cells[0].textContent, marked: !!tr.querySelector('sup') }));
+    }, report);
+    expect(doc).toEqual([{ name: 'Strict synthetic', marked: true }, { name: 'Inclusive synthetic', marked: false }]);
+    expect(report).toContain('außerhalb des angegebenen Labor-Referenzbereichs');
+  });
+
   test('marker and legend appear live for an out-of-range value and clear when fixed', async ({ page }) => {
     await gotoApp(page);
     await seed(page, blankState({
@@ -49,12 +68,12 @@ test.describe('Lab table', () => {
     await page.locator('.labtbl input[data-lk="base"] >> nth=0').blur();
 
     await expect(page.locator('.labtbl input.oor')).toHaveCount(1);
-    await expect(page.locator('#v-lab')).toContainText('außerhalb des angegebenen Normbereichs');
+    await expect(page.locator('#v-lab')).toContainText('außerhalb des angegebenen Labor-Referenzbereichs');
 
     await page.fill('.labtbl input[data-lk="base"] >> nth=0', '85');
     await page.locator('.labtbl input[data-lk="base"] >> nth=0').blur();
 
     await expect(page.locator('.labtbl input.oor')).toHaveCount(0);
-    await expect(page.locator('#v-lab')).not.toContainText('außerhalb des angegebenen Normbereichs');
+    await expect(page.locator('#v-lab')).not.toContainText('außerhalb des angegebenen Labor-Referenzbereichs');
   });
 });

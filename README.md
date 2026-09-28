@@ -42,6 +42,7 @@ it silently, no PWA install prompt and no offline support in that case.
 - Offline GI food guide: a small curated set of peer-reviewed reference values with local search and filters, reachable from the carb calculator. A low GI does not imply few carbohydrates or keto suitability.
 - Weekly tracking: waist, resting heart rate, sleep, stress, steps, and weekly notes; Today can remind you when the current or recent check-in is due and open the existing Week form
 - Laboratory tracking: baseline and follow-up values, reference ranges, and changes over time
+- In Laborwerte, “Laborbefund einfügen” accepts four tab-separated columns (Parameter, Wert, Einheit, Referenzbereich) for baseline entry. Parsing and preview happen locally before confirmation; confirmation replaces the baseline panel and retains existing follow-up values. Nothing is uploaded.
 - Measurement schedules: configure the five objective morning measurements as daily, selected weekdays, or optional
 - Today: schedule-aware completion count; completed scheduled entries collapse accessibly, while non-due measurements remain available. Historical and future dates keep the full entry layout
 - Optional local-only Commitment Mode: progress through the existing experiment, the daily Ja/Teils/Nein answer, and a factual rolling adherence summary

@@ -162,6 +162,29 @@ test.describe('Print output', () => {
     expect((html.match(/<ul class="refs">(.*?)<\/ul>/s)[1].match(/<li>/g) || []).length).toBe(13);
   });
 
+  test('a synthetic full laboratory panel remains a breakable report table', async ({ page, browserName }) => {
+    await gotoApp(page);
+    const labs = Array.from({ length: 100 }, (_, i) => ({
+      name: `Synthetic laboratory parameter ${i + 1}`, unit: 'U/l', range: '1 - 20', base: String(i % 20 + 1), end: '',
+    }));
+    await seed(page, blankState({ labs, labDates: { base: '2026-09-01', end: '' } }));
+    const report = await page.evaluate(() => reportHTML());
+    await page.evaluate(html => { document.getElementById('print').innerHTML = html; }, report);
+    await page.emulateMedia({ media: 'print' });
+    const result = await page.locator('.lab-report-table').evaluate(table => ({
+      rows: table.querySelectorAll('tbody tr').length,
+      breakInside: getComputedStyle(table).breakInside,
+      headerGroup: getComputedStyle(table.tHead).display,
+      lastName: table.querySelector('tbody tr:last-child td').textContent,
+    }));
+    expect(result).toEqual({ rows: 100, breakInside: 'auto', headerGroup: 'table-header-group',
+      lastName: 'Synthetic laboratory parameter 100' });
+    if (browserName === 'chromium') {
+      const pdf = await page.pdf({ format: 'A4', printBackground: true });
+      expect((pdf.toString('latin1').match(/\/Type \/Page\b/g) || []).length).toBeGreaterThan(1);
+    }
+  });
+
   test('report retains a stopped medication, adherence, and dose-change identity', async ({ page }) => {
     await gotoApp(page);
     const start = addDays(today(), -30), stopAt = addDays(start, 15);
