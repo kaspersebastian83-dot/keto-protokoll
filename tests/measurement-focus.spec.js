@@ -1,7 +1,61 @@
 const { test, expect } = require('@playwright/test');
+const fs = require('node:fs/promises');
 const { gotoApp, seed, blankState, today } = require('./helpers');
 
 const readings = { w: 82, g: 95, k: 1.2, sys1: 128, dia1: 82, sys2: 126, dia2: 78, p: 64 };
+
+// Temporary CI diagnostics: observe geometry without scrolling, restoring
+// focus, changing application state, or adding a settling delay.
+test.beforeEach(async ({ page }) => {
+  await page.addInitScript(() => {
+    const snapshots = [];
+    const capture = (phase, el, trigger) => {
+      const box = el.getBoundingClientRect();
+      const viewport = window.visualViewport;
+      const navBottom = document.querySelector('nav').getBoundingClientRect().bottom;
+      const top = Math.max(viewport?.offsetTop || 0, navBottom);
+      const bottom = viewport ? viewport.offsetTop + viewport.height : innerHeight;
+      const active = document.activeElement;
+      const predicates = {
+        focus: active === el, connected: el.isConnected, height: box.height > 0,
+        topBound: box.top >= top, bottomBound: box.bottom <= bottom,
+      };
+      const snapshot = {
+        phase, trigger, time: performance.now(),
+        input: { id: el.id, dataF: el.dataset.f },
+        isConnected: el.isConnected,
+        activeElement: { tag: active?.tagName, id: active?.id, dataF: active?.dataset?.f },
+        box: { top: box.top, bottom: box.bottom, height: box.height },
+        visualViewport: { offsetTop: viewport?.offsetTop ?? null, height: viewport?.height ?? null },
+        innerHeight, navBottom, scrollY,
+        scrollHeight: document.documentElement.scrollHeight,
+        clientHeight: document.documentElement.clientHeight,
+        bounds: { top, bottom }, predicates,
+        visible: Object.values(predicates).every(Boolean),
+      };
+      snapshots.push(snapshot);
+      return snapshot;
+    };
+    window.__measurementViewportDiagnostics = { snapshots, capture };
+    document.addEventListener('keydown', event => {
+      if (event.key !== 'Tab') return;
+      const active = document.activeElement;
+      const block = active.closest('[data-today-measurement="bp"]');
+      if (!block) return;
+      const controls = [...block.querySelectorAll('summary,input[data-f]')];
+      const next = controls[controls.indexOf(active) + (event.shiftKey ? -1 : 1)];
+      if (next?.matches('input[data-f]')) capture('before-focus', next, 'Tab keydown');
+    }, true);
+    document.addEventListener('focusout', event => {
+      if (event.relatedTarget?.matches('#v-day input[data-f]'))
+        capture('before-focus', event.relatedTarget, 'focusout');
+    }, true);
+    document.addEventListener('focusin', event => {
+      if (event.target.matches('#v-day input[data-f]'))
+        capture('after-focus', event.target, 'focusin');
+    }, true);
+  });
+});
 
 // Send real pointer events: locator.fill()/focus() complete focus synchronously
 // and can conceal the blur-handler race during browser-driven focus changes.
@@ -18,16 +72,44 @@ async function tapVisible(page, locator, mobile) {
 }
 
 async function expectFocusedInViewport(page, input) {
-  // Drain the queued compaction before inspecting focus and final layout.
-  await page.evaluate(() => new Promise(resolve => setTimeout(resolve, 0)));
-  await expect(input).toBeFocused();
-  await expect.poll(() => input.evaluate(el => {
-    const box = el.getBoundingClientRect();
-    const viewport = window.visualViewport;
-    const top = Math.max(viewport?.offsetTop || 0, document.querySelector('nav').getBoundingClientRect().bottom);
-    const bottom = viewport ? viewport.offsetTop + viewport.height : innerHeight;
-    return el.isConnected && document.activeElement === el && box.height > 0 && box.top >= top && box.bottom <= bottom;
-  })).toBe(true);
+  try {
+    // Preserve the existing single macrotask before the strict assertions.
+    await input.evaluate(el => new Promise(resolve => setTimeout(() => {
+      window.__measurementViewportDiagnostics.capture('after-one-macrotask', el, 'visibility helper');
+      resolve();
+    }, 0)));
+    await expect(input).toBeFocused();
+    await expect.poll(async () => {
+      const snapshot = await input.evaluate(el =>
+        window.__measurementViewportDiagnostics.capture('poll', el, 'visibility helper'));
+      if (!snapshot.visible) console.log('VIEWPORT_POLL_FALSE ' + JSON.stringify(snapshot));
+      return snapshot.visible;
+    }).toBe(true);
+  } catch (error) {
+    // Diagnostic failures must never replace the original assertion failure.
+    try {
+      await input.evaluate(el =>
+        window.__measurementViewportDiagnostics.capture('final-failure', el, 'visibility helper'));
+    } catch (captureError) {
+      console.log('VIEWPORT_FINAL_CAPTURE_ERROR ' + captureError.message);
+    }
+    try {
+      const diagnostics = {
+        test: test.info().title, project: test.info().project.name,
+        retry: test.info().retry, platform: process.platform,
+        snapshots: await page.evaluate(() => window.__measurementViewportDiagnostics.snapshots),
+      };
+      console.log('VIEWPORT_FAILURE_DIAGNOSTICS ' + JSON.stringify(diagnostics));
+      const diagnosticPath = test.info().outputPath('measurement-viewport-diagnostics.json');
+      await fs.writeFile(diagnosticPath, JSON.stringify(diagnostics, null, 2));
+      await test.info().attach('measurement-viewport-diagnostics', {
+        path: diagnosticPath, contentType: 'application/json',
+      });
+    } catch (captureError) {
+      console.log('VIEWPORT_HISTORY_CAPTURE_ERROR ' + captureError.message);
+    }
+    throw error;
+  }
 }
 
 for (const [id, fields] of [['g', ['g']], ['k', ['k']], ['bp', ['sys1', 'dia1', 'sys2', 'dia2']], ['p', ['p']]]) {
@@ -173,10 +255,12 @@ test('queued compactions recheck the live destination after a burst of group foc
   const destination = await page.evaluateHandle(() => {
     document.querySelectorAll('.today-complete').forEach(details => { details.open = true; });
     const pulse = document.querySelector('#f_p');
+    window.__measurementViewportDiagnostics.capture('before-focus', pulse, 'before queued burst');
     // All transitions occur in one task, leaving multiple blur callbacks
     // pending. No stale callback may replace the final active control.
     for (const field of ['sys1', 'g', 'k', 'p', 'sys2', 'g', 'k', 'p'])
       document.querySelector(`[data-f="${field}"]`).focus();
+    window.__measurementViewportDiagnostics.capture('after-focus', pulse, 'after queued burst');
     return pulse;
   });
   await expectFocusedInViewport(page, page.locator('#f_p'));
