@@ -1054,11 +1054,18 @@ function measurementHasInvalidDraft(block){
  return [...block.querySelectorAll('input[data-f]')].some(input=>invalidMeasurementDrafts.has(input));
 }
 function syncTodayMeasurement(block){
- if(!block.isConnected||block.contains(document.activeElement)||curDate!==today())return;
+ const active=document.activeElement;
+ if(!block.isConnected||block.contains(active)||curDate!==today())return;
  if(measurementHasInvalidDraft(block))return;
  const id=block.dataset.todayMeasurement,d=S.days[curDate]||{};
  const compact=!!block.querySelector(':scope > details.today-complete');
- if(measurementComplete(id,d)||compact)block.innerHTML=todayMeasurementBody(id,d);
+ if(measurementComplete(id,d)||compact){
+  // Preserve the focused destination when an editor above it loses height.
+  // Measure after layout so native scroll anchoring is not applied twice.
+  const anchor=active.closest('#v-day')?active:null,top=anchor?.getBoundingClientRect().top;
+  block.innerHTML=todayMeasurementBody(id,d);
+  if(anchor?.isConnected)window.scrollBy(0,anchor.getBoundingClientRect().top-top);
+ }
 }
 function renderDay(){
  const d=S.days[curDate]||{},i=diffDays(S.settings.start,curDate),inR=i>=0&&i<N();
@@ -1351,7 +1358,9 @@ $('#v-day').addEventListener('change',e=>{
 });
 $('#v-day').addEventListener('focusout',e=>{
  const block=e.target.closest('[data-today-measurement]');
- if(block)queueMicrotask(()=>syncTodayMeasurement(block));
+ // Native pointer/Tab focus moves finish after blur's microtask checkpoint.
+ // Wait until the destination is active before deciding to rebuild the editor.
+ if(block)setTimeout(()=>syncTodayMeasurement(block),0);
 });
 $('#v-day').addEventListener('click',e=>{
  const b=e.target.closest('button');if(!b)return;

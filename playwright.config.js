@@ -19,6 +19,6 @@ module.exports = defineConfig({
     { name: 'chromium', use: { ...devices['Desktop Chrome'] }, testIgnore: '**/mobile-webkit.spec.js' },
     { name: 'webkit', use: { ...devices['Desktop Safari'] }, testIgnore: '**/mobile-webkit.spec.js' },
     { name: 'mobile-webkit', use: { ...devices['iPhone 13'] },
-      testMatch: ['**/mobile-autosave.spec.js', '**/mobile-webkit.spec.js'] },
+      testMatch: ['**/mobile-autosave.spec.js', '**/mobile-webkit.spec.js', '**/measurement-focus.spec.js'] },
   ],
 });
